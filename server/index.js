@@ -197,7 +197,8 @@ const mapRowToImovel = (row) => ({
 });
 
 // Normaliza linha de lead para o formato esperado no frontend
-const mapRowToLead = (row) => ({\n  id: String(row.id || ''),
+const mapRowToLead = (row) => ({
+  id: String(row.id || ''),
   imovelId: String(row.imovelId || ''),
   imovelTitulo: String(row.imovelTitulo || ''),
   cliente: {
