@@ -6,11 +6,18 @@ const client = new Client({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-await client.connect();
-console.log('✓ PostgreSQL conectado');
+let isConnected = false;
 
 export const initializeDatabase = async () => {
   try {
+    if (!isConnected) {
+      console.log('🔌 Conectando ao PostgreSQL...');
+      await client.connect();
+      isConnected = true;
+      console.log('✓ PostgreSQL conectado');
+    }
+    
+    console.log('📋 Criando tabelas...');
     await client.query(`
       CREATE TABLE IF NOT EXISTS imoveis (
         id TEXT PRIMARY KEY,

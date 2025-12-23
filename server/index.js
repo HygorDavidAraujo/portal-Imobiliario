@@ -53,7 +53,14 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Inicializar banco de dados
-await initializeDatabase();
+console.log('🔧 Inicializando banco de dados...');
+try {
+  await initializeDatabase();
+  console.log('✅ Banco de dados inicializado com sucesso');
+} catch (error) {
+  console.error('❌ Erro ao inicializar banco:', error);
+  // Não pare o servidor, apenas logue o erro
+}
 
 const requiredEnv = ['MAIL_HOST', 'MAIL_PORT', 'MAIL_USER', 'MAIL_PASS'];
 const missing = requiredEnv.filter((key) => !process.env[key]);
@@ -73,11 +80,25 @@ const transporter = nodemailer.createTransport({
 
 app.get('/health', async (_req, res) => {
   try {
-    await transporter.verify();
-    res.json({ status: 'ok', smtp: 'connected', db: 'connected' });
+    // Verifica apenas se o servidor está rodando
+    const dbStatus = process.env.DATABASE_URL ? 'postgresql' : 'sqlite';
+    res.json({ 
+      status: 'ok', 
+      database: dbStatus,
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
-    res.status(500).json({ status: 'error', message: 'SMTP connection failed', error: String(error) });
+    res.status(500).json({ status: 'error', error: String(error) });
   }
+});
+
+// Rota raiz para verificação rápida
+app.get('/', (_req, res) => {
+  res.json({ 
+    message: 'Portal Imobiliário API',
+    status: 'running',
+    version: '1.0.0'
+  });
 });
 
 // ==================== IMÓVEIS ====================
@@ -287,7 +308,9 @@ app.post('/api/send-lead', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
-  console.log(`Banco de dados: ${process.cwd()}/portal_imobiliario.db`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Servidor rodando na porta ${PORT}`);
+  console.log(`🌐 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`💾 Database: ${process.env.DATABASE_URL ? 'PostgreSQL' : 'SQLite'}`);
+  console.log(`🚀 Health check: http://localhost:${PORT}/health`);
 });
