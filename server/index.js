@@ -137,6 +137,16 @@ app.post('/api/imoveis', async (req, res) => {
     const imovel = req.body;
     const fotosJson = JSON.stringify(imovel.fotos || []);
 
+    // Garantir objetos aninhados para evitar erros de acesso a propriedades indefinidas
+    const endereco = imovel.endereco || {};
+    const fichaTecnica = imovel.fichaTecnica || {};
+    const dadosApartamento = imovel.dadosApartamento || {};
+    const dadosLoteCondominio = imovel.dadosLoteCondominio || {};
+    const dadosCondominio = imovel.dadosCondominio || {};
+    const dadosRural = imovel.dadosRural || {};
+    const tipologia = imovel.tipologia || {};
+    const infoDono = imovel.infoDono || {};
+
     const stmt = db.prepare(`
       INSERT INTO imoveis (
         id, titulo, descricao, categoria, tipo, preco, ativo,
@@ -154,15 +164,15 @@ app.post('/api/imoveis', async (req, res) => {
 
     await stmt.run(
       imovel.id, imovel.titulo, imovel.descricao, imovel.categoria, imovel.tipo, imovel.preco, imovel.ativo,
-      imovel.endereco.logradouro, imovel.endereco.numero, imovel.endereco.bairro, imovel.endereco.cidade, imovel.endereco.estado, imovel.endereco.cep, imovel.endereco.complemento,
-      imovel.fichaTecnica.quartos, imovel.fichaTecnica.suites, imovel.fichaTecnica.banheiros, imovel.fichaTecnica.vagasGaragem, imovel.fichaTecnica.areaTotal, imovel.fichaTecnica.areaConstruida, imovel.fichaTecnica.anoConstructao, imovel.fichaTecnica.mobiliado, imovel.fichaTecnica.valorIptu, imovel.fichaTecnica.valorItu,
-      imovel.fichaTecnica.escritorio, imovel.fichaTecnica.lavabo, imovel.fichaTecnica.despensa, imovel.fichaTecnica.areaServico, imovel.fichaTecnica.jardim, imovel.fichaTecnica.varandaGourmet, imovel.fichaTecnica.piscinaPrivativa, imovel.fichaTecnica.churrasqueiraPrivativa,
-      imovel.dadosApartamento?.numeroApartamento, imovel.dadosApartamento?.andar, imovel.dadosApartamento?.blocoTorre, imovel.dadosApartamento?.nomeEmpreendimento, imovel.dadosApartamento?.elevador, imovel.dadosApartamento?.fachada,
-      imovel.dadosLoteCondominio?.nomeEmpreendimento, imovel.dadosLoteCondominio?.quadra, imovel.dadosLoteCondominio?.lote,
-      imovel.dadosCondominio.valorCondominio, imovel.dadosCondominio.seguranca24h, imovel.dadosCondominio.portaria, imovel.dadosCondominio.elevador, imovel.dadosCondominio.quadraEsportiva, imovel.dadosCondominio.piscina, imovel.dadosCondominio.salaoDeFestas, imovel.dadosCondominio.churrasqueira, imovel.dadosCondominio.playground, imovel.dadosCondominio.academia, imovel.dadosCondominio.vagasVisitante, imovel.dadosCondominio.salaCinema, imovel.dadosCondominio.hortaComunitaria, imovel.dadosCondominio.areaGourmetChurrasqueira, imovel.dadosCondominio.miniMercado, imovel.dadosCondominio.portariaRemota, imovel.dadosCondominio.coworking,
-      imovel.dadosRural?.rio, imovel.dadosRural?.piscina, imovel.dadosRural?.represa, imovel.dadosRural?.lago, imovel.dadosRural?.curral, imovel.dadosRural?.estabulo, imovel.dadosRural?.galinheiro, imovel.dadosRural?.pocilga, imovel.dadosRural?.silo, imovel.dadosRural?.terraceamento, imovel.dadosRural?.energia, imovel.dadosRural?.agua, imovel.dadosRural?.acessoAsfalto, imovel.dadosRural?.casariao, imovel.dadosRural?.areaAlqueires, imovel.dadosRural?.tipoAlqueire, imovel.dadosRural?.valorItr,
-      imovel.tipologia.tipoVenda, imovel.tipologia.aceitaPermuta, imovel.tipologia.aceitaFinanciamento,
-      fotosJson, imovel.infoDono.nome, imovel.infoDono.cpf, imovel.infoDono.telefone, imovel.infoDono.email
+      endereco.logradouro, endereco.numero, endereco.bairro, endereco.cidade, endereco.estado, endereco.cep, endereco.complemento,
+      fichaTecnica.quartos, fichaTecnica.suites, fichaTecnica.banheiros, fichaTecnica.vagasGaragem, fichaTecnica.areaTotal, fichaTecnica.areaConstruida, fichaTecnica.anoConstructao, fichaTecnica.mobiliado, fichaTecnica.valorIptu, fichaTecnica.valorItu,
+      fichaTecnica.escritorio, fichaTecnica.lavabo, fichaTecnica.despensa, fichaTecnica.areaServico, fichaTecnica.jardim, fichaTecnica.varandaGourmet, fichaTecnica.piscinaPrivativa, fichaTecnica.churrasqueiraPrivativa,
+      dadosApartamento.numeroApartamento, dadosApartamento.andar, dadosApartamento.blocoTorre, dadosApartamento.nomeEmpreendimento, dadosApartamento.elevador, dadosApartamento.fachada,
+      dadosLoteCondominio.nomeEmpreendimento, dadosLoteCondominio.quadra, dadosLoteCondominio.lote,
+      dadosCondominio.valorCondominio, dadosCondominio.seguranca24h, dadosCondominio.portaria, dadosCondominio.elevador, dadosCondominio.quadraEsportiva, dadosCondominio.piscina, dadosCondominio.salaoDeFestas, dadosCondominio.churrasqueira, dadosCondominio.playground, dadosCondominio.academia, dadosCondominio.vagasVisitante, dadosCondominio.salaCinema, dadosCondominio.hortaComunitaria, dadosCondominio.areaGourmetChurrasqueira, dadosCondominio.miniMercado, dadosCondominio.portariaRemota, dadosCondominio.coworking,
+      dadosRural.rio, dadosRural.piscina, dadosRural.represa, dadosRural.lago, dadosRural.curral, dadosRural.estabulo, dadosRural.galinheiro, dadosRural.pocilga, dadosRural.silo, dadosRural.terraceamento, dadosRural.energia, dadosRural.agua, dadosRural.acessoAsfalto, dadosRural.casariao, dadosRural.areaAlqueires, dadosRural.tipoAlqueire, dadosRural.valorItr,
+      tipologia.tipoVenda, tipologia.aceitaPermuta, tipologia.aceitaFinanciamento,
+      fotosJson, infoDono.nome, infoDono.cpf, infoDono.telefone, infoDono.email
     );
 
     res.json({ id: imovel.id });

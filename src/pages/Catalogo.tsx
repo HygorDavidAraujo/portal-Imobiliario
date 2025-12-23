@@ -4,6 +4,7 @@ import { useImoveis } from '../contexts/ImoveisContext';
 import { FiltrosCatalogo, Imovel } from '../types';
 import { formatarMoeda, obterFotoDestaque } from '../utils/helpers';
 import { Phone, Mail, Facebook, Instagram, MapPin, Bed, Bath, Car, Maximize, Search, Filter, Heart } from 'lucide-react';
+import logo from '../img/logo.png';
 
 export const Catalogo: React.FC = () => {
   const { imoveis, favoritos } = useImoveis();
@@ -40,7 +41,7 @@ export const Catalogo: React.FC = () => {
             {/* Logo e Nome */}
             <div className="flex items-center gap-4">
               <img
-                src="/src/img/logo.png"
+                src={logo}
                 alt="Logo Hygor David Araújo"
                 className="w-16 h-16 rounded-lg shadow-lg object-contain"
               />
