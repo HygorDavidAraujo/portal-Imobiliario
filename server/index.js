@@ -418,6 +418,32 @@ app.post('/api/send-lead', async (req, res) => {
     .join('');
 
   try {
+    // Fallback via Resend API (evita bloqueios SMTP e timeouts)
+    if (process.env.RESEND_API_KEY) {
+      const mailFrom = process.env.MAIL_FROM || process.env.MAIL_USER || 'onboarding@resend.dev';
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: mailFrom,
+          to,
+          subject: assunto,
+          html,
+        }),
+      });
+
+      if (response.ok) {
+        return res.json({ ok: true, provider: 'resend' });
+      } else {
+        const detail = await response.text();
+        console.error('Resend falhou:', detail);
+        // Continua para tentar SMTP abaixo
+      }
+    }
+
     await transporter.sendMail({
       from: `Portal Imobiliário <${process.env.MAIL_USER}>`,
       to,
@@ -426,7 +452,7 @@ app.post('/api/send-lead', async (req, res) => {
       html,
     });
 
-    res.json({ ok: true });
+    res.json({ ok: true, provider: 'smtp' });
   } catch (error) {
     console.error('Erro ao enviar e-mail:', error);
     res.status(500).json({ error: 'Falha ao enviar e-mail', detail: String(error) });
