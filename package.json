@@ -8,10 +8,12 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "echo 'Backend não precisa de build'",
+    "build:frontend": "tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "server": "node server/index.js"
+    "server": "node server/index.js",
+    "start": "node server/index.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
