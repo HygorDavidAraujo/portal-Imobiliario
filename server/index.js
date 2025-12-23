@@ -105,7 +105,7 @@ app.get('/', (_req, res) => {
 
 app.get('/api/imoveis', async (_req, res) => {
   try {
-    const imoveis = await db.prepare('SELECT * FROM imoveis WHERE ativo = ? ORDER BY criadoEm DESC').all(true);
+    const imoveis = await db.prepare('SELECT * FROM imoveis WHERE ativo = TRUE ORDER BY criadoEm DESC').all();
     const imoveisComFotos = (imoveis || []).map((imovel) => ({
       ...imovel,
       fotos: JSON.parse(imovel.fotos || '[]'),
