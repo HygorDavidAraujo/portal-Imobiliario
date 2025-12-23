@@ -17,9 +17,14 @@ if (process.env.DATABASE_URL) {
 } else {
   // SQLite (desenvolvimento local)
   console.log('📁 Usando SQLite');
-  const dbModule = await import('./database.js');
-  db = dbModule.default;
-  initializeDatabase = dbModule.initializeDatabase;
+  try {
+    const dbModule = await import('./database.js');
+    db = dbModule.default;
+    initializeDatabase = dbModule.initializeDatabase;
+  } catch (error) {
+    console.error('⚠️  SQLite não disponível. Use PostgreSQL em produção.');
+    throw new Error('Configure DATABASE_URL para usar PostgreSQL');
+  }
 }
 
 const app = express();
