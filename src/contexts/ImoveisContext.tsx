@@ -168,6 +168,7 @@ export const ImoveisProvider: React.FC<ImoveisProviderProps> = ({ children }) =>
           nomeCliente: lead.cliente.nome,
           telefoneCliente: lead.cliente.telefone,
           emailCliente: lead.cliente.email,
+          cliente: lead.cliente,
         }),
       });
 
