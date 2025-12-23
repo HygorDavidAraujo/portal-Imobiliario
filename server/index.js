@@ -2,18 +2,53 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
-import db, { initializeDatabase } from './database.js';
 
 dotenv.config();
+
+// Escolhe o banco baseado na variável de ambiente
+let db, initializeDatabase;
+
+if (process.env.DATABASE_URL) {
+  // PostgreSQL (produção Railway)
+  console.log('🐘 Usando PostgreSQL');
+  const dbModule = await import('./database-postgres.js');
+  db = dbModule.default;
+  initializeDatabase = dbModule.initializeDatabase;
+} else {
+  // SQLite (desenvolvimento local)
+  console.log('📁 Usando SQLite');
+  const dbModule = await import('./database.js');
+  db = dbModule.default;
+  initializeDatabase = dbModule.initializeDatabase;
+}
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
-app.use(express.json());
+// CORS configurado para produção
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  process.env.FRONTEND_URL,
+  process.env.VERCEL_URL
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.some(allowed => origin.includes(allowed))) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Permite todos em desenvolvimento
+    }
+  },
+  credentials: true
+}));
+
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Inicializar banco de dados
-initializeDatabase();
+await initializeDatabase();
 
 const requiredEnv = ['MAIL_HOST', 'MAIL_PORT', 'MAIL_USER', 'MAIL_PASS'];
 const missing = requiredEnv.filter((key) => !process.env[key]);
