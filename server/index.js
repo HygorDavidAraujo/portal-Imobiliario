@@ -78,6 +78,112 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Mapeia linha do banco (flat) para objeto Imovel do frontend (aninhado)
+const mapRowToImovel = (row) => ({
+  id: row.id,
+  categoria: row.categoria,
+  tipo: row.tipo,
+  titulo: row.titulo,
+  descricao: row.descricao,
+  preco: Number(row.preco || 0),
+  endereco: {
+    logradouro: row.endereco_logradouro || '',
+    numero: row.endereco_numero || '',
+    complemento: row.endereco_complemento || '',
+    bairro: row.endereco_bairro || '',
+    cidade: row.endereco_cidade || '',
+    estado: row.endereco_estado || '',
+    cep: row.endereco_cep || '',
+  },
+  dadosApartamento: {
+    numeroApartamento: row.numeroApartamento || '',
+    andar: row.andar || '',
+    blocoTorre: row.blocoTorre || '',
+    nomeEmpreendimento: row.nomeEmpreendimento || '',
+    elevador: !!row.elevador,
+    fachada: row.fachada || '',
+  },
+  dadosLoteCondominio: {
+    nomeEmpreendimento: row.nomeEmpreendimentoLote || '',
+    quadra: row.quadraLote || '',
+    lote: row.loteLote || '',
+  },
+  dadosCondominio: {
+    valorCondominio: row.valorCondominio != null ? Number(row.valorCondominio) : undefined,
+    seguranca24h: !!row.seguranca24h,
+    portaria: !!row.portaria,
+    elevador: !!row.elevadorCondominio,
+    quadraEsportiva: !!row.quadraEsportiva,
+    piscina: !!row.piscina,
+    salaoDeFestas: !!row.salaoDeFestas,
+    churrasqueira: !!row.churrasqueira,
+    playground: !!row.playground,
+    academia: !!row.academia,
+    vagasVisitante: !!row.vagasVisitante,
+    salaCinema: !!row.salaCinema,
+    hortaComunitaria: !!row.hortaComunitaria,
+    areaGourmetChurrasqueira: !!row.areaGourmetChurrasqueira,
+    miniMercado: !!row.miniMercado,
+    portariaRemota: !!row.portariaRemota,
+    coworking: !!row.coworking,
+  },
+  dadosRural: {
+    rio: !!row.rio,
+    piscina: !!row.piscinaRural,
+    represa: !!row.represa,
+    lago: !!row.lago,
+    curral: !!row.curral,
+    estabulo: !!row.estabulo,
+    galinheiro: !!row.galinheiro,
+    pocilga: !!row.pocilga,
+    silo: !!row.silo,
+    terraceamento: !!row.terraceamento,
+    energia: !!row.energia,
+    agua: !!row.agua,
+    acessoAsfalto: !!row.acessoAsfalto,
+    casariao: !!row.casariao,
+    areaAlqueires: row.areaAlqueires != null ? Number(row.areaAlqueires) : undefined,
+    tipoAlqueire: row.tipoAlqueire || undefined,
+    valorItr: row.valorItr != null ? Number(row.valorItr) : undefined,
+  },
+  fichaTecnica: {
+    areaTotal: row.areaTotal != null ? Number(row.areaTotal) : undefined,
+    areaConstruida: row.areaConstruida != null ? Number(row.areaConstruida) : undefined,
+    quartos: row.quartos != null ? Number(row.quartos) : undefined,
+    suites: row.suites != null ? Number(row.suites) : undefined,
+    banheiros: row.banheiros != null ? Number(row.banheiros) : undefined,
+    vagasGaragem: row.vagasGaragem != null ? Number(row.vagasGaragem) : undefined,
+    anoConstructao: row.anoConstructao != null ? Number(row.anoConstructao) : undefined,
+    mobiliado: !!row.mobiliado,
+    escritorio: !!row.escritorio,
+    lavabo: !!row.lavabo,
+    despensa: !!row.despensa,
+    areaServico: !!row.areaServico,
+    jardim: !!row.jardim,
+    varandaGourmet: !!row.varandaGourmet,
+    piscinaPrivativa: !!row.piscinaPrivativa,
+    churrasqueiraPrivativa: !!row.churrasqueiraPrivativa,
+    valorIptu: row.valorIptu != null ? Number(row.valorIptu) : undefined,
+    valorItu: row.valorItu != null ? Number(row.valorItu) : undefined,
+  },
+  tipologia: {
+    tipoVenda: row.tipoVenda || 'Venda',
+    aceitaPermuta: !!row.aceitaPermuta,
+    aceitaFinanciamento: !!row.aceitaFinanciamento,
+  },
+  fotos: (() => {
+    try { return JSON.parse(row.fotos || '[]'); } catch { return []; }
+  })(),
+  proprietario: {
+    nome: row.nomeDono || '',
+    telefone: row.telefoneDono || '',
+    email: row.emailDono || '',
+    cpf: row.cpfDono || '',
+  },
+  dataCadastro: row.criadoEm ? new Date(row.criadoEm) : new Date(),
+  ativo: !!row.ativo,
+});
+
 app.get('/health', async (_req, res) => {
   try {
     // Verifica apenas se o servidor está rodando
@@ -105,12 +211,9 @@ app.get('/', (_req, res) => {
 
 app.get('/api/imoveis', async (_req, res) => {
   try {
-    const imoveis = await db.prepare('SELECT * FROM imoveis WHERE ativo = TRUE ORDER BY criadoEm DESC').all();
-    const imoveisComFotos = (imoveis || []).map((imovel) => ({
-      ...imovel,
-      fotos: JSON.parse(imovel.fotos || '[]'),
-    }));
-    res.json(imoveisComFotos);
+    const rows = await db.prepare('SELECT * FROM imoveis WHERE ativo = TRUE ORDER BY criadoEm DESC').all();
+    const mapped = (rows || []).map(mapRowToImovel);
+    res.json(mapped);
   } catch (error) {
     console.error('Erro ao buscar imóveis:', error);
     res.status(500).json({ error: 'Erro ao buscar imóveis' });
@@ -120,12 +223,11 @@ app.get('/api/imoveis', async (_req, res) => {
 app.get('/api/imoveis/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const imovel = await db.prepare('SELECT * FROM imoveis WHERE id = ?').get(id);
-    if (!imovel) {
+    const row = await db.prepare('SELECT * FROM imoveis WHERE id = ?').get(id);
+    if (!row) {
       return res.status(404).json({ error: 'Imóvel não encontrado' });
     }
-    imovel.fotos = JSON.parse(imovel.fotos || '[]');
-    res.json(imovel);
+    res.json(mapRowToImovel(row));
   } catch (error) {
     console.error('Erro ao buscar imóvel:', error);
     res.status(500).json({ error: 'Erro ao buscar imóvel' });
