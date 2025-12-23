@@ -65,12 +65,22 @@ export const ImoveisProvider: React.FC<ImoveisProviderProps> = ({ children }) =>
 
         if (leadsRes.ok) {
           const dadosLeads = await leadsRes.json();
-          // Converter datas de string para Date
-          const leadsComDatas = dadosLeads.map((lead: any) => ({
+          const leadsNormalizados = (dadosLeads || []).map((lead: any) => ({
             ...lead,
-            data: new Date(lead.criadoEm),
+            cliente: lead.cliente || {
+              nome: lead.clienteNome || lead.nomeCliente || '',
+              email: lead.clienteEmail || '',
+              telefone: lead.clienteTelefone || '',
+            },
+            imovelTitulo: lead.imovelTitulo || lead.titulo || '',
+            data: lead.data
+              ? new Date(lead.data)
+              : lead.criadoEm
+                ? new Date(lead.criadoEm)
+                : new Date(),
+            visualizado: !!lead.visualizado,
           }));
-          setLeads(leadsComDatas);
+          setLeads(leadsNormalizados);
         }
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
@@ -154,6 +164,7 @@ export const ImoveisProvider: React.FC<ImoveisProviderProps> = ({ children }) =>
         body: JSON.stringify({
           id: lead.id,
           imovelId: lead.imovelId,
+          imovelTitulo: lead.imovelTitulo,
           nomeCliente: lead.cliente.nome,
           telefoneCliente: lead.cliente.telefone,
           emailCliente: lead.cliente.email,

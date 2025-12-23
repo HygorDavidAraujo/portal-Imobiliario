@@ -196,6 +196,21 @@ const mapRowToImovel = (row) => ({
   ativo: !!row.ativo,
 });
 
+// Normaliza linha de lead para o formato esperado no frontend
+const mapRowToLead = (row) => ({
+  id: row.id,
+  imovelId: row.imovelId,
+  imovelTitulo: row.imovelTitulo || '',
+  cliente: {
+    nome: row.clienteNome || row.nomeCliente || '',
+    email: row.clienteEmail || '',
+    telefone: row.clienteTelefone || '',
+  },
+  mensagem: row.mensagem || '',
+  data: row.criadoEm ? new Date(row.criadoEm) : new Date(),
+  visualizado: !!row.visualizado,
+});
+
 app.get('/health', async (_req, res) => {
   try {
     // Verifica apenas se o servidor está rodando
@@ -354,7 +369,8 @@ app.delete('/api/imoveis/:id', async (req, res) => {
 app.get('/api/leads', async (_req, res) => {
   try {
     const leads = await db.prepare('SELECT * FROM leads ORDER BY criadoEm DESC').all();
-    res.json(leads || []);
+    const mapped = (leads || []).map(mapRowToLead);
+    res.json(mapped);
   } catch (error) {
     console.error('Erro ao buscar leads:', error);
     res.status(500).json({ error: 'Erro ao buscar leads' });
