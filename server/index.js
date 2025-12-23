@@ -197,16 +197,15 @@ const mapRowToImovel = (row) => ({
 });
 
 // Normaliza linha de lead para o formato esperado no frontend
-const mapRowToLead = (row) => ({
-  id: row.id,
-  imovelId: row.imovelId,
-  imovelTitulo: row.imovelTitulo || '',
+const mapRowToLead = (row) => ({\n  id: String(row.id || ''),
+  imovelId: String(row.imovelId || ''),
+  imovelTitulo: String(row.imovelTitulo || ''),
   cliente: {
-    nome: row.clienteNome || row.nomeCliente || '',
-    email: row.clienteEmail || '',
-    telefone: row.clienteTelefone || '',
+    nome: String(row.clienteNome || ''),
+    email: String(row.clienteEmail || ''),
+    telefone: String(row.clienteTelefone || ''),
   },
-  mensagem: row.mensagem || '',
+  mensagem: String(row.mensagem || ''),
   data: row.criadoEm ? new Date(row.criadoEm) : new Date(),
   visualizado: !!row.visualizado,
 });
@@ -369,7 +368,14 @@ app.delete('/api/imoveis/:id', async (req, res) => {
 app.get('/api/leads', async (_req, res) => {
   try {
     const leads = await db.prepare('SELECT * FROM leads ORDER BY criadoEm DESC').all();
+    console.log('📊 GET /api/leads:', leads?.length || 0, 'found');
+    if (leads && leads.length > 0) {
+      console.log('  Raw lead 0:', leads[0]);
+    }
     const mapped = (leads || []).map(mapRowToLead);
+    if (mapped.length > 0) {
+      console.log('  Mapped lead 0:', mapped[0]);
+    }
     res.json(mapped);
   } catch (error) {
     console.error('Erro ao buscar leads:', error);
@@ -395,7 +401,10 @@ app.post('/api/leads', async (req, res) => {
     const email = emailCliente || cliente.email;
     const titulo = imovelTitulo || req.body?.titulo;
 
+    console.log('📝 Lead POST:', { id, imovelId, titulo, nome, email, telefone });
+
     if (!id || !imovelId || !titulo || !nome || !telefone || !email) {
+      console.error('❌ Missing:', { id: !!id, imovelId: !!imovelId, titulo: !!titulo, nome: !!nome, telefone: !!telefone, email: !!email });
       return res.status(400).json({ error: 'Campos obrigatórios ausentes para lead' });
     }
     const stmt = db.prepare(
