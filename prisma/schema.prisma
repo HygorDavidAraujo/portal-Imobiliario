@@ -1,0 +1,159 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./portal_imobiliario.db"
+}
+
+model Imovel {
+  id                    String   @id @default(cuid())
+  titulo                String
+  descricao             String?
+  categoria             String   // 'Residencial', 'Comercial', 'Rural'
+  tipo                  String   // Casa, Apartamento, Lote, etc
+  preco                 Float
+  ativo                 Boolean  @default(true)
+  
+  // Endereço
+  endereco_logradouro   String?
+  endereco_numero       String?
+  endereco_bairro       String?
+  endereco_cidade       String?
+  endereco_estado       String?
+  endereco_cep          String?
+  endereco_complemento  String?
+  
+  // Ficha Técnica
+  quartos               Int?
+  suites                Int?
+  banheiros             Int?
+  vagasGaragem          Int?
+  areaTotal             Float?
+  areaConstruida        Float?
+  anoConstructao        Int?
+  mobiliado             Boolean  @default(false)
+  valorIptu             Float?
+  valorItu              Float?
+  
+  // Casa Differentials
+  escritorio            Boolean  @default(false)
+  lavabo                Boolean  @default(false)
+  despensa              Boolean  @default(false)
+  areaServico           Boolean  @default(false)
+  jardim                Boolean  @default(false)
+  varandaGourmet        Boolean  @default(false)
+  piscinaPrivativa      Boolean  @default(false)
+  churrasqueiraPrivativa Boolean @default(false)
+  
+  // Dados Apartamento
+  numeroApartamento     String?
+  andar                 String?
+  blocoTorre            String?
+  nomeEmpreendimento    String?
+  elevador              Boolean?
+  fachada               String?
+  
+  // Dados Lote em Condomínio
+  nomeEmpreendimentoLote String?
+  quadraLote            String?
+  loteLote              String?
+  
+  // Condominio
+  valorCondominio       Float?
+  seguranca24h          Boolean  @default(false)
+  portaria              Boolean  @default(false)
+  elevadorCondominio    Boolean  @default(false)
+  quadraEsportiva       Boolean  @default(false)
+  piscina               Boolean  @default(false)
+  salaoDeFestas         Boolean  @default(false)
+  churrasqueira         Boolean  @default(false)
+  playground            Boolean  @default(false)
+  academia              Boolean  @default(false)
+  vagasVisitante        Boolean  @default(false)
+  salaCinema            Boolean  @default(false)
+  hortaComunitaria      Boolean  @default(false)
+  areaGourmetChurrasqueira Boolean @default(false)
+  miniMercado           Boolean  @default(false)
+  portariaRemota        Boolean  @default(false)
+  coworking             Boolean  @default(false)
+  
+  // Rural
+  rio                   Boolean  @default(false)
+  piscinaRural          Boolean  @default(false)
+  represa               Boolean  @default(false)
+  lago                  Boolean  @default(false)
+  curral                Boolean  @default(false)
+  estabulo              Boolean  @default(false)
+  galinheiro            Boolean  @default(false)
+  pocilga               Boolean  @default(false)
+  silo                  Boolean  @default(false)
+  terraceamento         Boolean  @default(false)
+  energia               Boolean  @default(false)
+  agua                  Boolean  @default(false)
+  acessoAsfalto         Boolean  @default(false)
+  casariao              Boolean  @default(false)
+  areaAlqueires         Float?
+  tipoAlqueire          String?   // 'Goiano', 'Paulista', 'Baiano', 'Mineiro'
+  valorItr              Float?
+  
+  // Tipologia
+  tipoVenda             String?   // 'Venda', 'Aluguel'
+  aceitaPermuta         Boolean   @default(false)
+  aceitaFinanciamento   Boolean   @default(false)
+  
+  // Fotos (JSON array)
+  fotos                 String    @default("[]") // JSON array
+  
+  // Owner
+  nomeDono              String?
+  cpfDono               String?
+  telefoneDono          String?
+  emailDono             String?
+  
+  // Timestamps
+  criadoEm              DateTime  @default(now())
+  atualizadoEm          DateTime  @updatedAt
+  
+  // Relacionamentos
+  leads                 Lead[]
+
+  @@index([categoria])
+  @@index([tipo])
+  @@index([ativo])
+}
+
+model Lead {
+  id                    String   @id @default(cuid())
+  imovelId              String
+  imovel                Imovel   @relation(fields: [imovelId], references: [id], onDelete: Cascade)
+  
+  // Cliente
+  nomeCliente           String
+  telefoneCliente       String
+  emailCliente          String
+  
+  // Status
+  visualizado           Boolean  @default(false)
+  
+  // Timestamp
+  criadoEm              DateTime  @default(now())
+  
+  @@index([imovelId])
+  @@index([visualizado])
+}
+
+model ContatoCliente {
+  id                    String   @id @default(cuid())
+  nome                  String
+  telefone              String
+  email                 String
+  criadoEm              DateTime  @default(now())
+}
