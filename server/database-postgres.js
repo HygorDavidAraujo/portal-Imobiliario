@@ -1,21 +1,24 @@
 import pg from 'pg';
-const { Client } = pg;
+const { Pool } = pg;
 
-const client = new Client({
+const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
 });
 
-let isConnected = false;
+pool.on('error', (err) => {
+  console.error('❌ Erro inesperado no pool de conexões:', err);
+});
 
 export const initializeDatabase = async () => {
+  let client;
   try {
-    if (!isConnected) {
-      console.log('🔌 Conectando ao PostgreSQL...');
-      await client.connect();
-      isConnected = true;
-      console.log('✓ PostgreSQL conectado');
-    }
+    console.log('🔌 Testando conexão ao PostgreSQL...');
+    client = await pool.connect();
+    console.log('✓ PostgreSQL conectado');
     
     console.log('📋 Criando tabelas...');
     await client.query(`
@@ -146,30 +149,51 @@ export const initializeDatabase = async () => {
     
     console.log('✓ Database PostgreSQL inicializado');
   } catch (error) {
-    console.error('Erro ao inicializar database:', error);
+    console.error('❌ Erro ao inicializar database:', error.message);
     throw error;
+  } finally {
+    if (client) {
+      client.release();
+    }
   }
 };
 
-// Funções de query para compatibilidade com SQLite
+// Funções de query para compatibilidade
 export const prepare = (sql) => {
   return {
     run: async (...params) => {
-      const result = await client.query(sql, params);
-      return result;
+      try {
+        const result = await pool.query(sql, params);
+        return result;
+      } catch (error) {
+        console.error('❌ Erro na query:', sql, error.message);
+        throw error;
+      }
     },
     get: async (...params) => {
-      const result = await client.query(sql, params);
-      return result.rows[0];
+      try {
+        const result = await pool.query(sql, params);
+        return result.rows[0];
+      } catch (error) {
+        console.error('❌ Erro na query:', sql, error.message);
+        throw error;
+      }
     },
     all: async (...params) => {
-      const result = await client.query(sql, params);
-      return result.rows;
+      try {
+        const result = await pool.query(sql, params);
+        return result.rows;
+      } catch (error) {
+        console.error('❌ Erro na query:', sql, error.message);
+        throw error;
+      }
     }
   };
 };
 
+export const query = (sql, params) => pool.query(sql, params);
+
 export default {
   prepare,
-  query: (sql, params) => client.query(sql, params)
+  query
 };
