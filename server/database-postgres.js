@@ -6,7 +6,7 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 10000,
 });
 
 // Converte placeholders estilo SQLite (?) para PostgreSQL ($1, $2...)
@@ -19,10 +19,28 @@ pool.on('error', (err) => {
   console.error('❌ Erro inesperado no pool de conexões:', err);
 });
 
+// Aguarda o banco ficar disponível com tentativas progressivas
+const waitForDatabase = async (retries = 10) => {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const c = await pool.connect();
+      c.release();
+      console.log(`✓ PostgreSQL disponível (tentativa ${attempt}/${retries})`);
+      return;
+    } catch (err) {
+      const code = err?.code || err?.message || 'erro-desconhecido';
+      console.warn(`⏳ Aguardando PostgreSQL (tentativa ${attempt}/${retries}): ${code}`);
+      await new Promise((r) => setTimeout(r, Math.min(5000, 300 * attempt)));
+    }
+  }
+  throw new Error('PostgreSQL indisponível após múltiplas tentativas');
+};
+
 export const initializeDatabase = async () => {
   let client;
   try {
     console.log('🔌 Testando conexão ao PostgreSQL...');
+    await waitForDatabase();
     client = await pool.connect();
     console.log('✓ PostgreSQL conectado');
     
