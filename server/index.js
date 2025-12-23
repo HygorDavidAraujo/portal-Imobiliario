@@ -68,13 +68,25 @@ if (missing.length) {
   console.warn(`Variáveis ausentes: ${missing.join(', ')}. O envio de e-mail não funcionará sem elas.`);
 }
 
+const mailPort = Number(process.env.MAIL_PORT) || 587;
+const mailSecure = typeof process.env.MAIL_SECURE !== 'undefined'
+  ? String(process.env.MAIL_SECURE).toLowerCase() === 'true'
+  : mailPort === 465;
+
 const transporter = nodemailer.createTransport({
   host: process.env.MAIL_HOST,
-  port: Number(process.env.MAIL_PORT) || 465,
-  secure: Number(process.env.MAIL_PORT) === 465,
+  port: mailPort,
+  secure: mailSecure,
   auth: {
     user: process.env.MAIL_USER,
     pass: process.env.MAIL_PASS,
+  },
+  connectionTimeout: Number(process.env.MAIL_CONNECTION_TIMEOUT) || 15000,
+  greetingTimeout: Number(process.env.MAIL_GREETING_TIMEOUT) || 10000,
+  socketTimeout: Number(process.env.MAIL_SOCKET_TIMEOUT) || 20000,
+  tls: {
+    // Evita falhas por SNI/CA em provedores comuns
+    rejectUnauthorized: false,
   },
 });
 
