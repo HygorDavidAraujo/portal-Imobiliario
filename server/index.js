@@ -103,10 +103,10 @@ app.get('/', (_req, res) => {
 
 // ==================== IMÓVEIS ====================
 
-app.get('/api/imoveis', (_req, res) => {
+app.get('/api/imoveis', async (_req, res) => {
   try {
-    const imoveis = db.prepare('SELECT * FROM imoveis WHERE ativo = 1 ORDER BY criadoEm DESC').all();
-    const imoveisComFotos = imoveis.map(imovel => ({
+    const imoveis = await db.prepare('SELECT * FROM imoveis WHERE ativo = ? ORDER BY criadoEm DESC').all(true);
+    const imoveisComFotos = (imoveis || []).map((imovel) => ({
       ...imovel,
       fotos: JSON.parse(imovel.fotos || '[]'),
     }));
@@ -117,10 +117,10 @@ app.get('/api/imoveis', (_req, res) => {
   }
 });
 
-app.get('/api/imoveis/:id', (req, res) => {
+app.get('/api/imoveis/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const imovel = db.prepare('SELECT * FROM imoveis WHERE id = ?').get(id);
+    const imovel = await db.prepare('SELECT * FROM imoveis WHERE id = ?').get(id);
     if (!imovel) {
       return res.status(404).json({ error: 'Imóvel não encontrado' });
     }
@@ -132,7 +132,7 @@ app.get('/api/imoveis/:id', (req, res) => {
   }
 });
 
-app.post('/api/imoveis', (req, res) => {
+app.post('/api/imoveis', async (req, res) => {
   try {
     const imovel = req.body;
     const fotosJson = JSON.stringify(imovel.fotos || []);
@@ -152,7 +152,7 @@ app.post('/api/imoveis', (req, res) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    stmt.run(
+    await stmt.run(
       imovel.id, imovel.titulo, imovel.descricao, imovel.categoria, imovel.tipo, imovel.preco, imovel.ativo,
       imovel.endereco.logradouro, imovel.endereco.numero, imovel.endereco.bairro, imovel.endereco.cidade, imovel.endereco.estado, imovel.endereco.cep, imovel.endereco.complemento,
       imovel.fichaTecnica.quartos, imovel.fichaTecnica.suites, imovel.fichaTecnica.banheiros, imovel.fichaTecnica.vagasGaragem, imovel.fichaTecnica.areaTotal, imovel.fichaTecnica.areaConstruida, imovel.fichaTecnica.anoConstructao, imovel.fichaTecnica.mobiliado, imovel.fichaTecnica.valorIptu, imovel.fichaTecnica.valorItu,
@@ -172,7 +172,7 @@ app.post('/api/imoveis', (req, res) => {
   }
 });
 
-app.put('/api/imoveis/:id', (req, res) => {
+app.put('/api/imoveis/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const imovel = req.body;
@@ -189,11 +189,11 @@ app.put('/api/imoveis/:id', (req, res) => {
         valorCondominio = ?, seguranca24h = ?, portaria = ?, elevadorCondominio = ?, quadraEsportiva = ?, piscina = ?, salaoDeFestas = ?, churrasqueira = ?, playground = ?, academia = ?, vagasVisitante = ?, salaCinema = ?, hortaComunitaria = ?, areaGourmetChurrasqueira = ?, miniMercado = ?, portariaRemota = ?, coworking = ?,
         rio = ?, piscinaRural = ?, represa = ?, lago = ?, curral = ?, estabulo = ?, galinheiro = ?, pocilga = ?, silo = ?, terraceamento = ?, energia = ?, agua = ?, acessoAsfalto = ?, casariao = ?, areaAlqueires = ?, tipoAlqueire = ?, valorItr = ?,
         tipoVenda = ?, aceitaPermuta = ?, aceitaFinanciamento = ?,
-        fotos = ?, nomeDono = ?, cpfDono = ?, telefoneDono = ?, emailDono = ?, atualizadoEm = CURRENT_TIMESTAMP
+        fotos = ?, nomeDono = ?, cpfDono = ?, telefoneDono = ?, emailDono = ?
       WHERE id = ?
     `);
 
-    stmt.run(
+    await stmt.run(
       imovel.titulo, imovel.descricao, imovel.categoria, imovel.tipo, imovel.preco, imovel.ativo,
       imovel.endereco.logradouro, imovel.endereco.numero, imovel.endereco.bairro, imovel.endereco.cidade, imovel.endereco.estado, imovel.endereco.cep, imovel.endereco.complemento,
       imovel.fichaTecnica.quartos, imovel.fichaTecnica.suites, imovel.fichaTecnica.banheiros, imovel.fichaTecnica.vagasGaragem, imovel.fichaTecnica.areaTotal, imovel.fichaTecnica.areaConstruida, imovel.fichaTecnica.anoConstructao, imovel.fichaTecnica.mobiliado, imovel.fichaTecnica.valorIptu, imovel.fichaTecnica.valorItu,
@@ -214,10 +214,10 @@ app.put('/api/imoveis/:id', (req, res) => {
   }
 });
 
-app.delete('/api/imoveis/:id', (req, res) => {
+app.delete('/api/imoveis/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    db.prepare('DELETE FROM imoveis WHERE id = ?').run(id);
+    await db.prepare('DELETE FROM imoveis WHERE id = ?').run(id);
     res.json({ ok: true });
   } catch (error) {
     console.error('Erro ao deletar imóvel:', error);
@@ -227,22 +227,23 @@ app.delete('/api/imoveis/:id', (req, res) => {
 
 // ==================== LEADS ====================
 
-app.get('/api/leads', (_req, res) => {
+app.get('/api/leads', async (_req, res) => {
   try {
-    const leads = db.prepare('SELECT * FROM leads ORDER BY criadoEm DESC').all();
-    res.json(leads);
+    const leads = await db.prepare('SELECT * FROM leads ORDER BY criadoEm DESC').all();
+    res.json(leads || []);
   } catch (error) {
     console.error('Erro ao buscar leads:', error);
     res.status(500).json({ error: 'Erro ao buscar leads' });
   }
 });
 
-app.post('/api/leads', (req, res) => {
+app.post('/api/leads', async (req, res) => {
   try {
-    const { id, imovelId, nomeCliente, telefoneCliente, emailCliente } = req.body;
-    db.prepare(
-      'INSERT INTO leads (id, imovelId, nomeCliente, telefoneCliente, emailCliente) VALUES (?, ?, ?, ?, ?)'
-    ).run(id, imovelId, nomeCliente, telefoneCliente, emailCliente);
+    const { id, imovelId, imovelTitulo, nomeCliente, telefoneCliente, emailCliente, mensagem } = req.body;
+    const stmt = db.prepare(
+      'INSERT INTO leads (id, imovelId, imovelTitulo, clienteNome, clienteEmail, clienteTelefone, mensagem) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    );
+    await stmt.run(id, imovelId, imovelTitulo, nomeCliente, emailCliente, telefoneCliente, mensagem || null);
     res.json({ ok: true });
   } catch (error) {
     console.error('Erro ao criar lead:', error);
@@ -250,10 +251,10 @@ app.post('/api/leads', (req, res) => {
   }
 });
 
-app.patch('/api/leads/:id', (req, res) => {
+app.patch('/api/leads/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    db.prepare('UPDATE leads SET visualizado = 1 WHERE id = ?').run(id);
+    await db.prepare('UPDATE leads SET visualizado = 1 WHERE id = ?').run(id);
     res.json({ ok: true });
   } catch (error) {
     console.error('Erro ao atualizar lead:', error);

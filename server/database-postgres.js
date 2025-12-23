@@ -9,6 +9,12 @@ const pool = new Pool({
   connectionTimeoutMillis: 2000,
 });
 
+// Converte placeholders estilo SQLite (?) para PostgreSQL ($1, $2...)
+const convertQuestionMarksToPg = (sql) => {
+  let idx = 0;
+  return sql.replace(/\?/g, () => `$${++idx}`);
+};
+
 pool.on('error', (err) => {
   console.error('❌ Erro inesperado no pool de conexões:', err);
 });
@@ -160,38 +166,41 @@ export const initializeDatabase = async () => {
 
 // Funções de query para compatibilidade
 export const prepare = (sql) => {
+  const pgSql = convertQuestionMarksToPg(sql);
   return {
     run: async (...params) => {
       try {
-        const result = await pool.query(sql, params);
-        return result;
+        return await pool.query(pgSql, params);
       } catch (error) {
-        console.error('❌ Erro na query:', sql, error.message);
+        console.error('❌ Erro na query:', pgSql, error.message);
         throw error;
       }
     },
     get: async (...params) => {
       try {
-        const result = await pool.query(sql, params);
+        const result = await pool.query(pgSql, params);
         return result.rows[0];
       } catch (error) {
-        console.error('❌ Erro na query:', sql, error.message);
+        console.error('❌ Erro na query:', pgSql, error.message);
         throw error;
       }
     },
     all: async (...params) => {
       try {
-        const result = await pool.query(sql, params);
+        const result = await pool.query(pgSql, params);
         return result.rows;
       } catch (error) {
-        console.error('❌ Erro na query:', sql, error.message);
+        console.error('❌ Erro na query:', pgSql, error.message);
         throw error;
       }
     }
   };
 };
 
-export const query = (sql, params) => pool.query(sql, params);
+export const query = (sql, params) => {
+  const pgSql = convertQuestionMarksToPg(sql);
+  return pool.query(pgSql, params);
+};
 
 export default {
   prepare,
