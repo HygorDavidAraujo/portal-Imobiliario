@@ -164,4 +164,5 @@ export interface FiltrosCatalogo {
   precoMin?: number;
   precoMax?: number;
   quartos?: number;
+  id?: string;
 }

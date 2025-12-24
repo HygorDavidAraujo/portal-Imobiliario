@@ -16,6 +16,7 @@ export const Catalogo: React.FC = () => {
     return imoveis.filter((imovel) => {
       if (!imovel.ativo) return false;
       if (mostrarApensFavoritos && !favoritos.includes(imovel.id)) return false;
+      if (filtros.id && !imovel.id.toLowerCase().includes(filtros.id.toLowerCase())) return false;
       if (filtros.categoria && imovel.categoria !== filtros.categoria) return false;
       if (filtros.tipo && imovel.tipo !== filtros.tipo) return false;
       if (filtros.bairro && imovel.endereco.bairro && !imovel.endereco.bairro.toLowerCase().includes(filtros.bairro.toLowerCase())) return false;
@@ -107,7 +108,15 @@ export const Catalogo: React.FC = () => {
           </button>
 
           <div className={`${mostrarFiltros ? 'block' : 'hidden'} md:block`}>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+              <input
+                type="text"
+                placeholder="Buscar por ID..."
+                value={filtros.id || ''}
+                onChange={(e) => setFiltros({ ...filtros, id: e.target.value })}
+                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              />
+
               <select
                 value={filtros.categoria || ''}
                 onChange={(e) => setFiltros({ ...filtros, categoria: e.target.value as any, tipo: undefined })}
@@ -262,8 +271,11 @@ const ImovelCard: React.FC<ImovelCardProps> = ({ imovel }) => {
 
       {/* Conteúdo */}
       <div className="p-4 flex flex-col flex-grow">
-        {/* Preço */}
-        <div className="mb-2">
+        {/* ID e Preço */}
+        <div className="mb-2 flex items-baseline justify-between gap-2">
+          <span className="text-xs font-mono font-semibold text-slate-500 bg-slate-100 px-2 py-1 rounded">
+            #{imovel.id}
+          </span>
           <span className="text-2xl font-bold text-blue-600">
             {formatarMoeda(imovel.preco)}
           </span>

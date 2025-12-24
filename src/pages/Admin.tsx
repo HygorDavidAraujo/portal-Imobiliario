@@ -2,12 +2,21 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useImoveis } from '../contexts/ImoveisContext';
 import { formatarMoeda, obterFotoDestaque } from '../utils/helpers';
-import { Plus, Edit, Trash2, Home, Building2, Users } from 'lucide-react';
+import { Plus, Edit, Trash2, Home, Building2, Users, Eye, EyeOff } from 'lucide-react';
 
 export const Admin: React.FC = () => {
-  const { imoveis, removerImovel, leads } = useImoveis();
+  const { imoveis, removerImovel, atualizarImovel, leads } = useImoveis();
 
   const leadsNaoVisualizados = leads.filter(l => !l.visualizado).length;
+
+  const handleToggleAtivo = async (imovel: any) => {
+    try {
+      await atualizarImovel(imovel.id, { ...imovel, ativo: !imovel.ativo });
+    } catch (error) {
+      console.error('Erro ao alterar status:', error);
+      alert('Erro ao alterar status do imóvel. Tente novamente.');
+    }
+  };
 
   const handleRemover = async (id: string) => {
     if (window.confirm('Tem certeza que deseja remover este imóvel?')) {
@@ -109,10 +118,18 @@ export const Admin: React.FC = () => {
                   {/* Informações */}
                   <div className="flex-1 p-6">
                     <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold mb-2">
-                          {imovel.categoria} - {imovel.tipo}
-                        </span>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="inline-block bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-mono font-semibold">
+                            #{imovel.id}
+                          </span>
+                          <span className={`inline-block ${imovel.ativo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} px-3 py-1 rounded-full text-xs font-semibold`}>
+                            {imovel.ativo ? 'Ativo' : 'Inativo'}
+                          </span>
+                          <span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold">
+                            {imovel.categoria} - {imovel.tipo}
+                          </span>
+                        </div>
                         <h3 className="text-xl font-bold text-slate-800">{imovel.titulo}</h3>
                       </div>
                       <div className="text-right">
@@ -134,6 +151,18 @@ export const Admin: React.FC = () => {
 
                     {/* Ações */}
                     <div className="flex gap-2">
+                      <button
+                        onClick={() => handleToggleAtivo(imovel)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                          imovel.ativo
+                            ? 'bg-orange-600 text-white hover:bg-orange-700'
+                            : 'bg-green-600 text-white hover:bg-green-700'
+                        }`}
+                        title={imovel.ativo ? 'Desativar (ocultar do catálogo)' : 'Ativar (mostrar no catálogo)'}
+                      >
+                        {imovel.ativo ? <EyeOff size={16} /> : <Eye size={16} />}
+                        {imovel.ativo ? 'Desativar' : 'Ativar'}
+                      </button>
                       <Link
                         to={`/admin/imovel/${imovel.id}`}
                         className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
