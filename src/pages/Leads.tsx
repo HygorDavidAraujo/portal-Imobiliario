@@ -5,7 +5,7 @@ import { formatarMoeda, obterFotoDestaque, formatarTelefone } from '../utils/hel
 import { Users, Eye, Home, Building2, Mail, Phone, Calendar } from 'lucide-react';
 
 export const Leads: React.FC = () => {
-  const { leads, marcarLeadComoVisualizado, imoveis } = useImoveis();
+  const { leads, marcarLeadComoVisualizado, imoveis, contatoCliente } = useImoveis();
 
   const leadsNaoVisualizados = leads.filter(l => !l.visualizado).length;
 
@@ -129,7 +129,7 @@ export const Leads: React.FC = () => {
                             </span>
                           )}
                           <h3 className="text-xl font-bold text-slate-800 mb-1">
-                            {lead.cliente?.nome || '(sem nome)'}
+                            {lead.cliente?.nome || contatoCliente?.nome || '(sem nome)'}
                           </h3>
                           <div className="flex items-center gap-2 text-slate-600 text-sm mb-2">
                             <Calendar size={16} />
@@ -141,9 +141,9 @@ export const Leads: React.FC = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
                         <div className="flex items-center gap-2 text-slate-700">
                           <Phone size={16} className="text-blue-600" />
-                          {lead.cliente?.telefone ? (
-                            <a href={`tel:${lead.cliente.telefone}`} className="hover:text-blue-600 transition-colors">
-                              {formatarTelefone(lead.cliente.telefone)}
+                          {(lead.cliente?.telefone || contatoCliente?.telefone) ? (
+                            <a href={`tel:${(lead.cliente?.telefone || contatoCliente?.telefone) ?? ''}`} className="hover:text-blue-600 transition-colors">
+                              {formatarTelefone((lead.cliente?.telefone || contatoCliente?.telefone) ?? '')}
                             </a>
                           ) : (
                             <span className="text-slate-400">(sem telefone)</span>
@@ -151,9 +151,9 @@ export const Leads: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-2 text-slate-700">
                           <Mail size={16} className="text-blue-600" />
-                          {lead.cliente?.email ? (
-                            <a href={`mailto:${lead.cliente.email}`} className="hover:text-blue-600 transition-colors truncate">
-                              {lead.cliente.email}
+                          {(lead.cliente?.email || contatoCliente?.email) ? (
+                            <a href={`mailto:${(lead.cliente?.email || contatoCliente?.email) ?? ''}`} className="hover:text-blue-600 transition-colors truncate">
+                              {(lead.cliente?.email || contatoCliente?.email) ?? ''}
                             </a>
                           ) : (
                             <span className="text-slate-400">(sem email)</span>
