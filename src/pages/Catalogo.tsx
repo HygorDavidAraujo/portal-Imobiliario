@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useImoveis } from '../contexts/ImoveisContext';
 import { FiltrosCatalogo, Imovel } from '../types';
 import { formatarMoeda, obterFotoDestaque } from '../utils/helpers';
-import { Phone, Mail, Facebook, Instagram, MapPin, Bed, Bath, Car, Maximize, Search, Filter, Heart } from 'lucide-react';
+import { Phone, Mail, Facebook, Instagram, MapPin, Bed, Bath, Car, Maximize, Search, Filter, Heart, Home } from 'lucide-react';
 import logo from '../img/logo.png';
 
 export const Catalogo: React.FC = () => {
@@ -46,9 +46,12 @@ export const Catalogo: React.FC = () => {
                 className="w-16 h-16 rounded-lg shadow-lg object-contain"
               />
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-gold-300 to-gold-500 bg-clip-text text-transparent">
-                  Hygor David Araújo
-                </h1>
+                <div className="flex items-center gap-2">
+                  <Home size={28} className="text-gold-400" />
+                  <h1 className="text-2xl font-bold bg-gradient-to-r from-gold-300 to-gold-500 bg-clip-text text-transparent">
+                    Hygor David Araújo
+                  </h1>
+                </div>
                 <p className="text-sm text-slate-300">Corretor de Imóveis</p>
                 <p className="text-xs text-gold-400 font-semibold">CRECI: 42.860</p>
               </div>
