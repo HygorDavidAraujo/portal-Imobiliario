@@ -6,7 +6,7 @@ interface ImoveisContextData {
   contatoCliente: ContatoCliente | null;
   leads: Lead[];
   favoritos: string[];
-  adicionarImovel: (imovel: Imovel) => Promise<void>;
+  adicionarImovel: (imovel: Imovel) => Promise<string>;
   atualizarImovel: (id: string, imovel: Imovel) => Promise<void>;
   removerImovel: (id: string) => Promise<void>;
   obterImovelPorId: (id: string) => Imovel | undefined;
@@ -105,8 +105,14 @@ export const ImoveisProvider: React.FC<ImoveisProviderProps> = ({ children }) =>
 
       if (!response.ok) throw new Error('Erro ao salvar imóvel');
 
-      // Atualizar lista local
-      setImoveis((prev) => [...prev, imovel]);
+      // Obter o ID gerado pelo backend
+      const data = await response.json();
+      const imovelComId = { ...imovel, id: data.id };
+
+      // Atualizar lista local com o ID correto
+      setImoveis((prev) => [...prev, imovelComId]);
+      
+      return data.id; // Retorna o ID gerado
     } catch (error) {
       console.error('Erro ao adicionar imóvel:', error);
       throw error;

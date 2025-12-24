@@ -293,7 +293,7 @@ export const GerenciamentoImoveis: React.FC = () => {
     }
 
     const imovel: Imovel = {
-      id: id || gerarId(),
+      id: id || '', // Backend gera o ID automaticamente
       categoria,
       tipo,
       titulo,
@@ -411,12 +411,13 @@ export const GerenciamentoImoveis: React.FC = () => {
       if (id) {
         console.log('Atualizando imóvel:', id);
         await atualizarImovel(id, imovel);
+        console.log('Imóvel atualizado com sucesso! Redirecionando...');
       } else {
-        console.log('Criando novo imóvel:', imovel.id);
-        await adicionarImovel(imovel);
+        console.log('Criando novo imóvel...');
+        const novoId = await adicionarImovel(imovel);
+        console.log('Imóvel criado com ID:', novoId, 'Redirecionando...');
       }
 
-      console.log('Imóvel salvo com sucesso! Redirecionando...');
       navigate('/admin');
     } catch (error) {
       console.error('Erro ao salvar imóvel:', error);

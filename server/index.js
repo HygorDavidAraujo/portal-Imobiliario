@@ -225,6 +225,52 @@ const mapRowToLead = (row) => {
   };
 };
 
+// Mapeia tipo do imóvel para prefixo de ID
+const obterPrefixoTipo = (tipo) => {
+  const mapeamento = {
+    'Casa': 'CA',
+    'Apartamento': 'AP',
+    'Sobrado': 'SO',
+    'Lote': 'LO',
+    'Chácara': 'CH',
+    'Fazenda': 'FZ',
+    'Sítio': 'SI',
+    'Terreno': 'TE',
+    'Prédio Comercial': 'PC',
+    'Sala Comercial': 'SC',
+    'Loja': 'LJ',
+    'Galpão': 'GA',
+    'Ponto Comercial': 'PT',
+    'Casa em Condomínio': 'CC',
+    'Lote em Condomínio': 'LC',
+    'Kitnet': 'KT',
+    'Studio': 'ST',
+    'Cobertura': 'CO',
+  };
+  return mapeamento[tipo] || 'IM';
+};
+
+// Gera próximo ID sequencial para o tipo de imóvel
+const gerarProximoId = async (tipo) => {
+  const prefixo = obterPrefixoTipo(tipo);
+  
+  // Busca o último ID com esse prefixo
+  const query = `SELECT id FROM imoveis WHERE id LIKE '${prefixo}%' ORDER BY id DESC LIMIT 1`;
+  const ultimoImovel = await db.prepare(query).get();
+  
+  if (!ultimoImovel) {
+    // Primeiro imóvel deste tipo
+    return `${prefixo}001`;
+  }
+  
+  // Extrai o número do último ID e incrementa
+  const ultimoNumero = parseInt(ultimoImovel.id.substring(prefixo.length)) || 0;
+  const proximoNumero = ultimoNumero + 1;
+  const numeroFormatado = String(proximoNumero).padStart(3, '0');
+  
+  return `${prefixo}${numeroFormatado}`;
+};
+
 app.get('/health', async (_req, res) => {
   try {
     // Verifica apenas se o servidor está rodando
@@ -280,6 +326,10 @@ app.post('/api/imoveis', async (req, res) => {
     const imovel = req.body;
     const fotosJson = JSON.stringify(imovel.fotos || []);
 
+    // Gerar ID sequencial baseado no tipo
+    const novoId = await gerarProximoId(imovel.tipo);
+    console.log(`📝 Gerando novo imóvel: ${novoId} (${imovel.tipo})`);
+
     // Garantir objetos aninhados para evitar erros de acesso a propriedades indefinidas
     const endereco = imovel.endereco || {};
     const fichaTecnica = imovel.fichaTecnica || {};
@@ -306,7 +356,7 @@ app.post('/api/imoveis', async (req, res) => {
     `);
 
     await stmt.run(
-      imovel.id, imovel.titulo, imovel.descricao, imovel.categoria, imovel.tipo, imovel.preco, imovel.ativo,
+      novoId, imovel.titulo, imovel.descricao, imovel.categoria, imovel.tipo, imovel.preco, imovel.ativo,
       endereco.logradouro, endereco.numero, endereco.bairro, endereco.cidade, endereco.estado, endereco.cep, endereco.complemento,
       fichaTecnica.quartos, fichaTecnica.suites, fichaTecnica.banheiros, fichaTecnica.vagasGaragem, fichaTecnica.areaTotal, fichaTecnica.areaConstruida, fichaTecnica.anoConstructao, fichaTecnica.mobiliado, fichaTecnica.valorIptu, fichaTecnica.valorItu,
       fichaTecnica.escritorio, fichaTecnica.lavabo, fichaTecnica.despensa, fichaTecnica.areaServico, fichaTecnica.jardim, fichaTecnica.varandaGourmet, fichaTecnica.piscinaPrivativa, fichaTecnica.churrasqueiraPrivativa,
@@ -318,7 +368,8 @@ app.post('/api/imoveis', async (req, res) => {
       fotosJson, infoDono.nome, infoDono.cpf, infoDono.telefone, infoDono.email
     );
 
-    res.json({ id: imovel.id });
+    console.log(`✅ Imóvel criado: ${novoId}`);
+    res.json({ id: novoId });
   } catch (error) {
     console.error('Erro ao criar imóvel:', error);
     res.status(500).json({ error: 'Erro ao criar imóvel' });
