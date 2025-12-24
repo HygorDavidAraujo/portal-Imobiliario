@@ -9,6 +9,17 @@ export const Leads: React.FC = () => {
 
   const leadsNaoVisualizados = leads.filter(l => !l.visualizado).length;
 
+  // Debug: log leads quando carregam
+  React.useEffect(() => {
+    console.log('📊 Leads carregados:', leads);
+    if (leads.length > 0) {
+      console.log('  Primeiro lead:', leads[0]);
+      console.log('  Cliente:', leads[0].cliente);
+      console.log('  Imóvel ID:', leads[0].imovelId);
+      console.log('  Imóvel Título:', leads[0].imovelTitulo);
+    }
+  }, [leads]);
+
   const obterImovel = (imovelId: string) => {
     return imoveis.find(i => i.id === imovelId);
   };
@@ -118,7 +129,7 @@ export const Leads: React.FC = () => {
                             </span>
                           )}
                           <h3 className="text-xl font-bold text-slate-800 mb-1">
-                            {lead.cliente.nome}
+                            {lead.cliente?.nome || '(sem nome)'}
                           </h3>
                           <div className="flex items-center gap-2 text-slate-600 text-sm mb-2">
                             <Calendar size={16} />
@@ -130,21 +141,29 @@ export const Leads: React.FC = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
                         <div className="flex items-center gap-2 text-slate-700">
                           <Phone size={16} className="text-blue-600" />
-                          <a href={`tel:${lead.cliente.telefone}`} className="hover:text-blue-600 transition-colors">
-                            {formatarTelefone(lead.cliente.telefone)}
-                          </a>
+                          {lead.cliente?.telefone ? (
+                            <a href={`tel:${lead.cliente.telefone}`} className="hover:text-blue-600 transition-colors">
+                              {formatarTelefone(lead.cliente.telefone)}
+                            </a>
+                          ) : (
+                            <span className="text-slate-400">(sem telefone)</span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 text-slate-700">
                           <Mail size={16} className="text-blue-600" />
-                          <a href={`mailto:${lead.cliente.email}`} className="hover:text-blue-600 transition-colors truncate">
-                            {lead.cliente.email}
-                          </a>
+                          {lead.cliente?.email ? (
+                            <a href={`mailto:${lead.cliente.email}`} className="hover:text-blue-600 transition-colors truncate">
+                              {lead.cliente.email}
+                            </a>
+                          ) : (
+                            <span className="text-slate-400">(sem email)</span>
+                          )}
                         </div>
                       </div>
 
                       <div className="bg-slate-50 rounded-lg p-3 mb-4">
                         <p className="text-sm text-slate-600 mb-1">Interesse no imóvel:</p>
-                        <p className="font-semibold text-slate-800">{lead.imovelTitulo}</p>
+                        <p className="font-semibold text-slate-800">{lead.imovelTitulo || '(imóvel não encontrado)'}</p>
                         {imovel && (
                           <p className="text-sm text-blue-600 mt-1">
                             {formatarMoeda(imovel.preco)}
