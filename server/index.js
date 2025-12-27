@@ -392,6 +392,11 @@ app.put('/api/imoveis/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const imovel = req.body;
+    
+    // DEBUG: Log para verificar os dados recebidos
+    console.log('🔄 Atualizando imóvel ID:', id);
+    console.log('   Ficha Técnica recebida:', JSON.stringify(imovel.fichaTecnica, null, 2));
+    
     const fotosJson = JSON.stringify(imovel.fotos || []);
 
     // Garantir objetos aninhados para evitar erros de acesso a propriedades indefinidas
