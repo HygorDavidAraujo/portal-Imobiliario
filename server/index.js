@@ -497,7 +497,7 @@ app.post('/api/leads', async (req, res) => {
 app.patch('/api/leads/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    await db.prepare('UPDATE leads SET visualizado = TRUE WHERE id = ?').run(id);
+    await db.prepare('UPDATE leads SET visualizado = ? WHERE id = ?').run(true, id);
     res.json({ ok: true });
   } catch (error) {
     console.error('Erro ao atualizar lead:', error);
