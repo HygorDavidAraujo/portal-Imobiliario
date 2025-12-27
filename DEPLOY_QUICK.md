@@ -5,6 +5,12 @@
 ### Passo 1: Preparação (2 min)
 
 ```bash
+# ⚠️ PRÉ-REQUISITOS DE CÓDIGO (Verifique antes de commitar):
+# 1. Backend (DB): A conexão deve usar `process.env.DATABASE_URL`
+# 2. Backend (CORS): O cors deve permitir `process.env.FRONTEND_URL`
+# 3. Frontend (API): As requisições devem apontar para `import.meta.env.VITE_API_BASE_URL`
+# 4. package.json: Garanta que existe o script "start": "node index.js" (ou seu arquivo principal)
+
 # Instale PostgreSQL driver
 npm install pg
 
