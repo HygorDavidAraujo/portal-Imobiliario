@@ -53,8 +53,12 @@ export const ImoveisProvider: React.FC<ImoveisProviderProps> = ({ children }) =>
   useEffect(() => {
     const carregarDados = async () => {
       try {
+        // Se a rota for de admin, busca todos os imóveis. Senão, apenas os ativos.
+        const isAdminRoute = window.location.pathname.startsWith('/admin');
+        const imoveisApiUrl = `${API_BASE_URL}/api/imoveis${isAdminRoute ? '?status=all' : ''}`;
+
         const [imoveisRes, leadsRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/imoveis`),
+          fetch(imoveisApiUrl),
           fetch(`${API_BASE_URL}/api/leads`),
         ]);
 

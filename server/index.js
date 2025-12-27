@@ -296,9 +296,21 @@ app.get('/', (_req, res) => {
 
 // ==================== IMÓVEIS ====================
 
-app.get('/api/imoveis', async (_req, res) => {
+app.get('/api/imoveis', async (req, res) => {
   try {
-    const rows = await db.prepare('SELECT * FROM imoveis WHERE ativo = TRUE ORDER BY criadoEm DESC').all();
+    const { status } = req.query;
+    let query = 'SELECT * FROM imoveis';
+    const params = [];
+
+    // Para o admin, mostrar todos. Para o público, apenas ativos.
+    if (status !== 'all') {
+      query += ' WHERE ativo = ?';
+      params.push(true);
+    }
+
+    query += ' ORDER BY criadoEm DESC';
+    
+    const rows = await db.prepare(query).all(...params);
     const mapped = (rows || []).map(mapRowToImovel);
     res.json(mapped);
   } catch (error) {
