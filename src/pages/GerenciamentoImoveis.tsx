@@ -284,33 +284,37 @@ export const GerenciamentoImoveis: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('Iniciando salvar imóvel...');
-    console.log('Fotos carregadas:', fotos.length);
-    console.log('Erros de validação:', erros);
-    
     if (!validarFormulario()) {
       console.log('Formulário inválido, abortando...');
       window.scrollTo(0, 0);
       return;
     }
 
-    const imovel: Imovel = {
-      id: id || '', // Backend gera o ID automaticamente
+    const baseImovel = id && imovelParaEdicao ? imovelParaEdicao : {
+      id: '',
+      dataCadastro: new Date(),
+      ativo: true,
+      endereco: {},
+      fichaTecnica: {},
+      tipologia: {},
+      proprietario: {},
+      fotos: [],
+    } as Imovel;
+
+    const imovelFinal: Imovel = {
+      ...baseImovel,
+      id: id || baseImovel.id,
       categoria,
       tipo,
       titulo,
       descricao,
       preco: converterValorBrasileiroParaNumero(preco),
       endereco: {
-        logradouro,
-        numero,
-        complemento,
-        bairro,
-        cidade,
-        estado,
-        cep,
+        ...baseImovel.endereco,
+        logradouro, numero, complemento, bairro, cidade, estado, cep,
       },
       fichaTecnica: {
+        ...baseImovel.fichaTecnica,
         areaTotal: areaTotal ? parseFloat(areaTotal) : undefined,
         areaConstruida: areaConstruida ? parseFloat(areaConstruida) : undefined,
         quartos: quartos ? parseInt(quartos) : undefined,
@@ -331,95 +335,65 @@ export const GerenciamentoImoveis: React.FC = () => {
         valorItu: valorItu ? converterValorBrasileiroParaNumero(valorItu) : undefined,
       },
       tipologia: {
-        tipoVenda,
-        aceitaPermuta,
-        aceitaFinanciamento,
+        ...baseImovel.tipologia,
+        tipoVenda, aceitaPermuta, aceitaFinanciamento,
       },
       fotos,
       proprietario: {
+        ...baseImovel.proprietario,
         nome: nomeProprietario,
         telefone: telefoneProprietario,
         email: emailProprietario,
         cpf: cpfProprietario,
       },
-      dataCadastro: new Date(),
-      ativo: true,
     };
-
-    if (tipo === 'Apartamento' && numeroApartamento) {
-      imovel.dadosApartamento = {
-        numeroApartamento,
-        andar,
-        blocoTorre,
-        nomeEmpreendimento,
-        elevador: elevadorApartamento,
-        fachada: fachada || undefined,
+    
+    if (tipo === 'Apartamento') {
+      imovelFinal.dadosApartamento = {
+        numeroApartamento, andar, blocoTorre, nomeEmpreendimento,
+        elevador: elevadorApartamento, fachada: fachada || undefined,
       };
+    } else {
+      delete imovelFinal.dadosApartamento;
     }
 
-    if (tipo === 'Lote em Condomínio' && nomeEmpreendimentoLote) {
-      imovel.dadosLoteCondominio = {
-        nomeEmpreendimento: nomeEmpreendimentoLote,
-        quadra: quadraLote,
-        lote: loteLote,
+    if (tipo === 'Lote em Condomínio') {
+      imovelFinal.dadosLoteCondominio = {
+        nomeEmpreendimento: nomeEmpreendimentoLote, quadra: quadraLote, lote: loteLote,
       };
+    } else {
+      delete imovelFinal.dadosLoteCondominio;
     }
 
     if (tipo.includes('Condomínio') || tipo === 'Apartamento') {
-      imovel.dadosCondominio = {
+      imovelFinal.dadosCondominio = {
         valorCondominio: valorCondominio ? converterValorBrasileiroParaNumero(valorCondominio) : undefined,
-        seguranca24h,
-        portaria,
-        elevador,
-        quadraEsportiva,
-        piscina,
-        salaoDeFestas,
-        churrasqueira,
-        playground,
-        academia,
-        vagasVisitante,
-        salaCinema,
-        hortaComunitaria,
-        areaGourmetChurrasqueira,
-        miniMercado,
-        portariaRemota,
-        coworking,
+        seguranca24h, portaria, elevador, quadraEsportiva, piscina, salaoDeFestas,
+        churrasqueira, playground, academia, vagasVisitante, salaCinema, hortaComunitaria,
+        areaGourmetChurrasqueira, miniMercado, portariaRemota, coworking,
       };
+    } else {
+      delete imovelFinal.dadosCondominio;
     }
 
     if (categoria === 'Rural') {
-      imovel.dadosRural = {
-        rio,
-        piscina: piscinaRural,
-        represa,
-        lago,
-        curral,
-        estabulo,
-        galinheiro,
-        pocilga,
-        silo,
-        terraceamento,
-        energia,
-        agua,
-        acessoAsfalto,
-        casariao,
+      imovelFinal.dadosRural = {
+        rio, piscina: piscinaRural, represa, lago, curral, estabulo, galinheiro, pocilga,
+        silo, terraceamento, energia, agua, acessoAsfalto, casariao,
         areaAlqueires: parseFloat(areaAlqueires) || undefined,
         tipoAlqueire,
         valorItr: valorItr ? converterValorBrasileiroParaNumero(valorItr) : undefined,
       };
+    } else {
+      delete imovelFinal.dadosRural;
     }
 
     try {
       if (id) {
-        console.log('Atualizando imóvel:', id);
-        await atualizarImovel(id, imovel);
-        console.log('Imóvel atualizado com sucesso! Redirecionando...');
+        await atualizarImovel(id, imovelFinal);
       } else {
-        console.log('Criando novo imóvel...');
-        const novoId = await adicionarImovel(imovel);
-        console.log('Imóvel criado com ID:', novoId, 'Redirecionando...');
+        await adicionarImovel(imovelFinal);
       }
-
       navigate('/admin');
     } catch (error) {
       console.error('Erro ao salvar imóvel:', error);

@@ -350,7 +350,7 @@ app.post('/api/imoveis', async (req, res) => {
     const dadosCondominio = imovel.dadosCondominio || {};
     const dadosRural = imovel.dadosRural || {};
     const tipologia = imovel.tipologia || {};
-    const infoDono = imovel.infoDono || {};
+    const proprietario = imovel.proprietario || imovel.infoDono || {}; // Compatibilidade
 
     const stmt = db.prepare(`
       INSERT INTO imoveis (
@@ -377,7 +377,7 @@ app.post('/api/imoveis', async (req, res) => {
       dadosCondominio.valorCondominio, dadosCondominio.seguranca24h, dadosCondominio.portaria, dadosCondominio.elevador, dadosCondominio.quadraEsportiva, dadosCondominio.piscina, dadosCondominio.salaoDeFestas, dadosCondominio.churrasqueira, dadosCondominio.playground, dadosCondominio.academia, dadosCondominio.vagasVisitante, dadosCondominio.salaCinema, dadosCondominio.hortaComunitaria, dadosCondominio.areaGourmetChurrasqueira, dadosCondominio.miniMercado, dadosCondominio.portariaRemota, dadosCondominio.coworking,
       dadosRural.rio, dadosRural.piscina, dadosRural.represa, dadosRural.lago, dadosRural.curral, dadosRural.estabulo, dadosRural.galinheiro, dadosRural.pocilga, dadosRural.silo, dadosRural.terraceamento, dadosRural.energia, dadosRural.agua, dadosRural.acessoAsfalto, dadosRural.casariao, dadosRural.areaAlqueires, dadosRural.tipoAlqueire, dadosRural.valorItr,
       tipologia.tipoVenda, tipologia.aceitaPermuta, tipologia.aceitaFinanciamento,
-      fotosJson, infoDono.nome, infoDono.cpf, infoDono.telefone, infoDono.email
+      fotosJson, proprietario.nome, proprietario.cpf, proprietario.telefone, proprietario.email
     );
 
     console.log(`✅ Imóvel criado: ${novoId}`);
