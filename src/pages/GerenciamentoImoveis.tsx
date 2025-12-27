@@ -116,14 +116,16 @@ export const GerenciamentoImoveis: React.FC = () => {
   
   const [erros, setErros] = useState<string[]>([]);
 
+  const imovelParaEdicao = id ? obterImovelPorId(id) : undefined;
+
   useEffect(() => {
-    if (id) {
-      const imovel = obterImovelPorId(id);
-      if (imovel) {
-        carregarImovel(imovel);
-      }
+    // Este efeito agora depende do objeto 'imovel' em si.
+    // Se o imóvel for atualizado no contexto (após salvar),
+    // o formulário será recarregado com os novos dados.
+    if (imovelParaEdicao) {
+      carregarImovel(imovelParaEdicao);
     }
-  }, [id]);
+  }, [imovelParaEdicao]);
 
   const carregarImovel = (imovel: Imovel) => {
     setCategoria(imovel.categoria);

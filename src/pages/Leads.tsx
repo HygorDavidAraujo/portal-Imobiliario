@@ -196,7 +196,7 @@ export const Leads: React.FC = () => {
                           </button>
                         )}
                         <a
-                          href={`https://wa.me/${lead.cliente.telefone.replace(/\D/g, '')}`}
+                          href={`https://wa.me/${(lead.cliente?.telefone || '').replace(/\D/g, '')}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
