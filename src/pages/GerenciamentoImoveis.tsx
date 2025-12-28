@@ -297,7 +297,12 @@ export const GerenciamentoImoveis: React.FC = () => {
       endereco: {},
       fichaTecnica: {},
       tipologia: {},
-      proprietario: {},
+      proprietario: {
+        nome: '',
+        telefone: '',
+        email: '',
+        cpf: '',
+      },
       fotos: [],
       categoria: 'Residencial',
       tipo: '',

@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
@@ -39,12 +39,16 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.some(allowed => origin.includes(allowed))) {
-      callback(null, true);
-    } else {
-      callback(null, true); // Permite todos em desenvolvimento
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      return callback(null, true);
     }
+    if (allowedOrigins.some(allowed => origin.includes(allowed))) {
+      return callback(null, true);
+    }
+    // Block other origins
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true
 }));
@@ -91,7 +95,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // Mapeia linha do banco (flat) para objeto Imovel do frontend (aninhado)
-const mapRowToImovel = (row) => ({
+const mapRowToImovel = (row: any) => ({
   id: row.id,
   categoria: row.categoria,
   tipo: row.tipo,
@@ -199,7 +203,7 @@ const mapRowToImovel = (row) => ({
 // Normaliza linha de lead para o formato esperado no frontend
 // Atenção: no PostgreSQL, identificadores não-quoted são convertidos para minúsculas
 // Ex.: clienteNome -> clientenome, imovelId -> imovelid
-const mapRowToLead = (row) => {
+const mapRowToLead = (row: any) => {
   const id = String(row.id || '');
   const imovelId = String(row.imovelId || row.imovelid || '');
   const imovelTitulo = String(row.imovelTitulo || row.imoveltitulo || row.titulo || '');
@@ -226,8 +230,8 @@ const mapRowToLead = (row) => {
 };
 
 // Mapeia tipo do imóvel para prefixo de ID
-const obterPrefixoTipo = (tipo) => {
-  const mapeamento = {
+const obterPrefixoTipo = (tipo: string) => {
+  const mapeamento: { [key: string]: string } = {
     'Casa': 'CA',
     'Apartamento': 'AP',
     'Sobrado': 'SO',
@@ -251,7 +255,7 @@ const obterPrefixoTipo = (tipo) => {
 };
 
 // Gera próximo ID sequencial para o tipo de imóvel
-const gerarProximoId = async (tipo) => {
+const gerarProximoId = async (tipo: string) => {
   const prefixo = obterPrefixoTipo(tipo);
   
   // Busca o último ID com esse prefixo
@@ -271,7 +275,7 @@ const gerarProximoId = async (tipo) => {
   return `${prefixo}${numeroFormatado}`;
 };
 
-app.get('/health', async (_req, res) => {
+app.get('/health', async (_req: Request, res: Response) => {
   try {
     // Verifica apenas se o servidor está rodando
     const dbStatus = process.env.DATABASE_URL ? 'postgresql' : 'sqlite';
@@ -286,7 +290,7 @@ app.get('/health', async (_req, res) => {
 });
 
 // Rota raiz para verificação rápida
-app.get('/', (_req, res) => {
+app.get('/', (_req: Request, res: Response) => {
   res.json({ 
     message: 'Portal Imobiliário API',
     status: 'running',
@@ -296,7 +300,7 @@ app.get('/', (_req, res) => {
 
 // ==================== IMÓVEIS ====================
 
-app.get('/api/imoveis', async (req, res) => {
+app.get('/api/imoveis', async (req: Request, res: Response) => {
   try {
     const { status } = req.query;
     let query = 'SELECT * FROM imoveis';
@@ -319,7 +323,7 @@ app.get('/api/imoveis', async (req, res) => {
   }
 });
 
-app.get('/api/imoveis/:id', async (req, res) => {
+app.get('/api/imoveis/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const row = await db.prepare('SELECT * FROM imoveis WHERE id = ?').get(id);
@@ -333,7 +337,7 @@ app.get('/api/imoveis/:id', async (req, res) => {
   }
 });
 
-app.post('/api/imoveis', async (req, res) => {
+app.post('/api/imoveis', async (req: Request, res: Response) => {
   try {
     const imovel = req.body;
     const fotosJson = JSON.stringify(imovel.fotos || []);
@@ -386,7 +390,7 @@ app.post('/api/imoveis', async (req, res) => {
   }
 });
 
-app.put('/api/imoveis/:id', async (req, res) => {
+app.put('/api/imoveis/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const imovel = req.body;
@@ -443,7 +447,7 @@ app.put('/api/imoveis/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/imoveis/:id', async (req, res) => {
+app.delete('/api/imoveis/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     await db.prepare('DELETE FROM imoveis WHERE id = ?').run(id);
@@ -456,7 +460,7 @@ app.delete('/api/imoveis/:id', async (req, res) => {
 
 // ==================== LEADS ====================
 
-app.get('/api/leads', async (_req, res) => {
+app.get('/api/leads', async (_req: Request, res: Response) => {
   try {
     const leads = await db.prepare('SELECT * FROM leads ORDER BY criadoEm DESC').all();
     console.log('📊 GET /api/leads:', leads?.length || 0, 'found');
@@ -474,7 +478,7 @@ app.get('/api/leads', async (_req, res) => {
   }
 });
 
-app.post('/api/leads', async (req, res) => {
+app.post('/api/leads', async (req: Request, res: Response) => {
   try {
     const {
       id,
@@ -509,7 +513,7 @@ app.post('/api/leads', async (req, res) => {
   }
 });
 
-app.patch('/api/leads/:id', async (req, res) => {
+app.patch('/api/leads/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     await db.prepare('UPDATE leads SET visualizado = ? WHERE id = ?').run(true, id);
@@ -522,7 +526,7 @@ app.patch('/api/leads/:id', async (req, res) => {
 
 // ==================== E-MAIL ====================
 
-app.post('/api/send-lead', async (req, res) => {
+app.post('/api/send-lead', async (req: Request, res: Response) => {
   const { imovelId, imovelTitulo, preco, endereco, contato, link } = req.body || {};
 
   if (!contato?.nome || !contato?.telefone || !contato?.email || !imovelId || !imovelTitulo) {
@@ -594,7 +598,7 @@ app.post('/api/send-lead', async (req, res) => {
 });
 
 // Middleware de tratamento de erros centralizado
-app.use((err, req, res, next) => {
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error('❌ Erro NÃO TRATADO:', err.stack || err);
 
   // Não vazar detalhes do erro em produção

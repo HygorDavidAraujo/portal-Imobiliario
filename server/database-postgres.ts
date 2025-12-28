@@ -18,7 +18,7 @@ export const initializeDatabase = async () => {
   try {
     await prisma.$connect();
     console.log('✅ Conexão com o banco de dados via Prisma estabelecida com sucesso.');
-  } catch (error)_ {
+  } catch (error) {
     console.error('❌ Não foi possível conectar ao banco de dados via Prisma:', error);
     throw error;
   }
@@ -124,16 +124,21 @@ const columnMappings = {
   visualizado: 'visualizado'
 };
 
-const prepare = (sql) => {
+const prepare = (sql: string) => {
   // Simplistic parser to determine the operation type and table
   const upperSql = sql.trim().toUpperCase();
 
-  const get = async (...params) => {
+  const get = async (...params: any[]) => {
     if (upperSql.startsWith('SELECT * FROM IMOVEIS WHERE ID = ?')) {
       return prisma.imovel.findUnique({ where: { id: params[0] } });
     }
     if (upperSql.startsWith("SELECT ID FROM IMOVEIS WHERE ID LIKE '")) {
-        const prefix = sql.match(/'([^']*)%'/)[1];
+        const match = sql.match(/'([^']*)%'/);
+        const prefix = match ? match[1] : null;
+        if (!prefix) {
+          console.warn('Prisma compatibility layer: Could not extract prefix from query', sql);
+          return null;
+        }
         return prisma.imovel.findFirst({
             where: { id: { startsWith: prefix } },
             orderBy: { id: 'desc' },
@@ -145,7 +150,7 @@ const prepare = (sql) => {
     return null;
   };
 
-  const all = async (...params) => {
+  const all = async (...params: any[]) => {
     if (upperSql.startsWith('SELECT * FROM IMOVEIS')) {
       const where = upperSql.includes('WHERE ATIVO = ?') ? { ativo: params[0] } : {};
       return prisma.imovel.findMany({
@@ -164,7 +169,7 @@ const prepare = (sql) => {
     return [];
   };
 
-  const run = async (...params) => {
+  const run = async (...params: any[]) => {
     if (upperSql.startsWith('INSERT INTO IMOVEIS')) {
       const data = {
         id: params[0], titulo: params[1], descricao: params[2], categoria: params[3], tipo: params[4], preco: params[5], ativo: params[6],
