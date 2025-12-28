@@ -299,6 +299,11 @@ export const GerenciamentoImoveis: React.FC = () => {
       tipologia: {},
       proprietario: {},
       fotos: [],
+      categoria: 'Residencial',
+      tipo: '',
+      titulo: '',
+      descricao: '',
+      preco: 0,
     } as Imovel;
 
     const imovelFinal: Imovel = {
@@ -315,13 +320,13 @@ export const GerenciamentoImoveis: React.FC = () => {
       },
       fichaTecnica: {
         ...baseImovel.fichaTecnica,
-        areaTotal: areaTotal ? parseFloat(areaTotal) : null,
-        areaConstruida: areaConstruida ? parseFloat(areaConstruida) : null,
-        quartos: quartos ? parseInt(quartos) : null,
-        suites: suites ? parseInt(suites) : null,
-        banheiros: banheiros ? parseInt(banheiros) : null,
-        vagasGaragem: vagasGaragem ? parseInt(vagasGaragem) : null,
-        anoConstructao: anoConstructao ? parseInt(anoConstructao) : null,
+        areaTotal: areaTotal ? parseFloat(areaTotal) : undefined,
+        areaConstruida: areaConstruida ? parseFloat(areaConstruida) : undefined,
+        quartos: quartos ? parseInt(quartos) : undefined,
+        suites: suites ? parseInt(suites) : undefined,
+        banheiros: banheiros ? parseInt(banheiros) : undefined,
+        vagasGaragem: vagasGaragem ? parseInt(vagasGaragem) : undefined,
+        anoConstructao: anoConstructao ? parseInt(anoConstructao) : undefined,
         mobiliado,
         escritorio,
         lavabo,
@@ -331,8 +336,8 @@ export const GerenciamentoImoveis: React.FC = () => {
         varandaGourmet,
         piscinaPrivativa,
         churrasqueiraPrivativa,
-        valorIptu: valorIptu ? converterValorBrasileiroParaNumero(valorIptu) : null,
-        valorItu: valorItu ? converterValorBrasileiroParaNumero(valorItu) : null,
+        valorIptu: valorIptu ? converterValorBrasileiroParaNumero(valorIptu) : undefined,
+        valorItu: valorItu ? converterValorBrasileiroParaNumero(valorItu) : undefined,
       },
       tipologia: {
         ...baseImovel.tipologia,
