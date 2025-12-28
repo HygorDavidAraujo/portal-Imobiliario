@@ -338,11 +338,9 @@ app.post('/api/imoveis', async (req, res) => {
     const imovel = req.body;
     const fotosJson = JSON.stringify(imovel.fotos || []);
 
-    // Gerar ID sequencial baseado no tipo
     const novoId = await gerarProximoId(imovel.tipo);
     console.log(`📝 Gerando novo imóvel: ${novoId} (${imovel.tipo})`);
 
-    // Garantir objetos aninhados para evitar erros de acesso a propriedades indefinidas
     const endereco = imovel.endereco || {};
     const fichaTecnica = imovel.fichaTecnica || {};
     const dadosApartamento = imovel.dadosApartamento || {};
@@ -350,7 +348,7 @@ app.post('/api/imoveis', async (req, res) => {
     const dadosCondominio = imovel.dadosCondominio || {};
     const dadosRural = imovel.dadosRural || {};
     const tipologia = imovel.tipologia || {};
-    const proprietario = imovel.proprietario || imovel.infoDono || {}; // Compatibilidade
+    const proprietario = imovel.proprietario || imovel.infoDono || {};
 
     const stmt = db.prepare(`
       INSERT INTO imoveis (
@@ -368,16 +366,16 @@ app.post('/api/imoveis', async (req, res) => {
     `);
 
     await stmt.run(
-      novoId, imovel.titulo, imovel.descricao, imovel.categoria, imovel.tipo, imovel.preco, imovel.ativo,
-      endereco.logradouro, endereco.numero, endereco.bairro, endereco.cidade, endereco.estado, endereco.cep, endereco.complemento,
-      fichaTecnica.quartos, fichaTecnica.suites, fichaTecnica.banheiros, fichaTecnica.vagasGaragem, fichaTecnica.areaTotal, fichaTecnica.areaConstruida, fichaTecnica.anoConstructao, fichaTecnica.mobiliado, fichaTecnica.valorIptu, fichaTecnica.valorItu,
-      fichaTecnica.escritorio, fichaTecnica.lavabo, fichaTecnica.despensa, fichaTecnica.areaServico, fichaTecnica.jardim, fichaTecnica.varandaGourmet, fichaTecnica.piscinaPrivativa, fichaTecnica.churrasqueiraPrivativa,
-      dadosApartamento.numeroApartamento, dadosApartamento.andar, dadosApartamento.blocoTorre, dadosApartamento.nomeEmpreendimento, dadosApartamento.elevador, dadosApartamento.fachada,
-      dadosLoteCondominio.nomeEmpreendimento, dadosLoteCondominio.quadra, dadosLoteCondominio.lote,
-      dadosCondominio.valorCondominio, dadosCondominio.seguranca24h, dadosCondominio.portaria, dadosCondominio.elevador, dadosCondominio.quadraEsportiva, dadosCondominio.piscina, dadosCondominio.salaoDeFestas, dadosCondominio.churrasqueira, dadosCondominio.playground, dadosCondominio.academia, dadosCondominio.vagasVisitante, dadosCondominio.salaCinema, dadosCondominio.hortaComunitaria, dadosCondominio.areaGourmetChurrasqueira, dadosCondominio.miniMercado, dadosCondominio.portariaRemota, dadosCondominio.coworking,
-      dadosRural.rio, dadosRural.piscina, dadosRural.represa, dadosRural.lago, dadosRural.curral, dadosRural.estabulo, dadosRural.galinheiro, dadosRural.pocilga, dadosRural.silo, dadosRural.terraceamento, dadosRural.energia, dadosRural.agua, dadosRural.acessoAsfalto, dadosRural.casariao, dadosRural.areaAlqueires, dadosRural.tipoAlqueire, dadosRural.valorItr,
-      tipologia.tipoVenda, tipologia.aceitaPermuta, tipologia.aceitaFinanciamento,
-      fotosJson, proprietario.nome, proprietario.cpf, proprietario.telefone, proprietario.email
+      novoId, imovel.titulo ?? null, imovel.descricao ?? null, imovel.categoria ?? null, imovel.tipo ?? null, imovel.preco ?? null, imovel.ativo ?? true,
+      endereco.logradouro ?? null, endereco.numero ?? null, endereco.bairro ?? null, endereco.cidade ?? null, endereco.estado ?? null, endereco.cep ?? null, endereco.complemento ?? null,
+      fichaTecnica.quartos ?? null, fichaTecnica.suites ?? null, fichaTecnica.banheiros ?? null, fichaTecnica.vagasGaragem ?? null, fichaTecnica.areaTotal ?? null, fichaTecnica.areaConstruida ?? null, fichaTecnica.anoConstructao ?? null, fichaTecnica.mobiliado ?? false, fichaTecnica.valorIptu ?? null, fichaTecnica.valorItu ?? null,
+      fichaTecnica.escritorio ?? false, fichaTecnica.lavabo ?? false, fichaTecnica.despensa ?? false, fichaTecnica.areaServico ?? false, fichaTecnica.jardim ?? false, fichaTecnica.varandaGourmet ?? false, fichaTecnica.piscinaPrivativa ?? false, fichaTecnica.churrasqueiraPrivativa ?? false,
+      dadosApartamento.numeroApartamento ?? null, dadosApartamento.andar ?? null, dadosApartamento.blocoTorre ?? null, dadosApartamento.nomeEmpreendimento ?? null, dadosApartamento.elevador ?? false, dadosApartamento.fachada ?? null,
+      dadosLoteCondominio.nomeEmpreendimento ?? null, dadosLoteCondominio.quadra ?? null, dadosLoteCondominio.lote ?? null,
+      dadosCondominio.valorCondominio ?? null, dadosCondominio.seguranca24h ?? false, dadosCondominio.portaria ?? false, dadosCondominio.elevador ?? false, dadosCondominio.quadraEsportiva ?? false, dadosCondominio.piscina ?? false, dadosCondominio.salaoDeFestas ?? false, dadosCondominio.churrasqueira ?? false, dadosCondominio.playground ?? false, dadosCondominio.academia ?? false, dadosCondominio.vagasVisitante ?? false, dadosCondominio.salaCinema ?? false, dadosCondominio.hortaComunitaria ?? false, dadosCondominio.areaGourmetChurrasqueira ?? false, dadosCondominio.miniMercado ?? false, dadosCondominio.portariaRemota ?? false, dadosCondominio.coworking ?? false,
+      dadosRural.rio ?? false, dadosRural.piscina ?? false, dadosRural.represa ?? false, dadosRural.lago ?? false, dadosRural.curral ?? false, dadosRural.estabulo ?? false, dadosRural.galinheiro ?? false, dadosRural.pocilga ?? false, dadosRural.silo ?? false, dadosRural.terraceamento ?? false, dadosRural.energia ?? false, dadosRural.agua ?? false, dadosRural.acessoAsfalto ?? false, dadosRural.casariao ?? false, dadosRural.areaAlqueires ?? null, dadosRural.tipoAlqueire ?? null, dadosRural.valorItr ?? null,
+      tipologia.tipoVenda ?? 'Venda', tipologia.aceitaPermuta ?? false, tipologia.aceitaFinanciamento ?? false,
+      fotosJson, proprietario.nome ?? null, proprietario.cpf ?? null, proprietario.telefone ?? null, proprietario.email ?? null
     );
 
     console.log(`✅ Imóvel criado: ${novoId}`);
@@ -393,13 +391,13 @@ app.put('/api/imoveis/:id', async (req, res) => {
     const { id } = req.params;
     const imovel = req.body;
     
-    // DEBUG: Log para verificar os dados recebidos
     console.log('🔄 Atualizando imóvel ID:', id);
-    console.log('   Ficha Técnica recebida:', JSON.stringify(imovel.fichaTecnica, null, 2));
+    if (imovel.fichaTecnica) {
+      console.log('   Ficha Técnica recebida:', JSON.stringify(imovel.fichaTecnica, null, 2));
+    }
     
     const fotosJson = JSON.stringify(imovel.fotos || []);
 
-    // Garantir objetos aninhados para evitar erros de acesso a propriedades indefinidas
     const endereco = imovel.endereco || {};
     const fichaTecnica = imovel.fichaTecnica || {};
     const dadosApartamento = imovel.dadosApartamento || {};
@@ -407,7 +405,7 @@ app.put('/api/imoveis/:id', async (req, res) => {
     const dadosCondominio = imovel.dadosCondominio || {};
     const dadosRural = imovel.dadosRural || {};
     const tipologia = imovel.tipologia || {};
-    const proprietario = imovel.proprietario || imovel.infoDono || {}; // Compatibilidade
+    const proprietario = imovel.proprietario || imovel.infoDono || {};
 
     const stmt = db.prepare(`
       UPDATE imoveis SET
@@ -425,16 +423,16 @@ app.put('/api/imoveis/:id', async (req, res) => {
     `);
 
     await stmt.run(
-      imovel.titulo, imovel.descricao, imovel.categoria, imovel.tipo, imovel.preco, imovel.ativo,
-      endereco.logradouro, endereco.numero, endereco.bairro, endereco.cidade, endereco.estado, endereco.cep, endereco.complemento,
-      fichaTecnica.quartos, fichaTecnica.suites, fichaTecnica.banheiros, fichaTecnica.vagasGaragem, fichaTecnica.areaTotal, fichaTecnica.areaConstruida, fichaTecnica.anoConstructao, fichaTecnica.mobiliado, fichaTecnica.valorIptu, fichaTecnica.valorItu,
-      fichaTecnica.escritorio, fichaTecnica.lavabo, fichaTecnica.despensa, fichaTecnica.areaServico, fichaTecnica.jardim, fichaTecnica.varandaGourmet, fichaTecnica.piscinaPrivativa, fichaTecnica.churrasqueiraPrivativa,
-      dadosApartamento.numeroApartamento, dadosApartamento.andar, dadosApartamento.blocoTorre, dadosApartamento.nomeEmpreendimento, dadosApartamento.elevador, dadosApartamento.fachada,
-      dadosLoteCondominio.nomeEmpreendimento, dadosLoteCondominio.quadra, dadosLoteCondominio.lote,
-      dadosCondominio.valorCondominio, dadosCondominio.seguranca24h, dadosCondominio.portaria, dadosCondominio.elevador, dadosCondominio.quadraEsportiva, dadosCondominio.piscina, dadosCondominio.salaoDeFestas, dadosCondominio.churrasqueira, dadosCondominio.playground, dadosCondominio.academia, dadosCondominio.vagasVisitante, dadosCondominio.salaCinema, dadosCondominio.hortaComunitaria, dadosCondominio.areaGourmetChurrasqueira, dadosCondominio.miniMercado, dadosCondominio.portariaRemota, dadosCondominio.coworking,
-      dadosRural.rio, dadosRural.piscina, dadosRural.represa, dadosRural.lago, dadosRural.curral, dadosRural.estabulo, dadosRural.galinheiro, dadosRural.pocilga, dadosRural.silo, dadosRural.terraceamento, dadosRural.energia, dadosRural.agua, dadosRural.acessoAsfalto, dadosRural.casariao, dadosRural.areaAlqueires, dadosRural.tipoAlqueire, dadosRural.valorItr,
-      tipologia.tipoVenda, tipologia.aceitaPermuta, tipologia.aceitaFinanciamento,
-      fotosJson, proprietario.nome, proprietario.cpf, proprietario.telefone, proprietario.email,
+      imovel.titulo ?? null, imovel.descricao ?? null, imovel.categoria ?? null, imovel.tipo ?? null, imovel.preco ?? null, imovel.ativo ?? true,
+      endereco.logradouro ?? null, endereco.numero ?? null, endereco.bairro ?? null, endereco.cidade ?? null, endereco.estado ?? null, endereco.cep ?? null, endereco.complemento ?? null,
+      fichaTecnica.quartos ?? null, fichaTecnica.suites ?? null, fichaTecnica.banheiros ?? null, fichaTecnica.vagasGaragem ?? null, fichaTecnica.areaTotal ?? null, fichaTecnica.areaConstruida ?? null, fichaTecnica.anoConstructao ?? null, fichaTecnica.mobiliado ?? false, fichaTecnica.valorIptu ?? null, fichaTecnica.valorItu ?? null,
+      fichaTecnica.escritorio ?? false, fichaTecnica.lavabo ?? false, fichaTecnica.despensa ?? false, fichaTecnica.areaServico ?? false, fichaTecnica.jardim ?? false, fichaTecnica.varandaGourmet ?? false, fichaTecnica.piscinaPrivativa ?? false, fichaTecnica.churrasqueiraPrivativa ?? false,
+      dadosApartamento.numeroApartamento ?? null, dadosApartamento.andar ?? null, dadosApartamento.blocoTorre ?? null, dadosApartamento.nomeEmpreendimento ?? null, dadosApartamento.elevador ?? false, dadosApartamento.fachada ?? null,
+      dadosLoteCondominio.nomeEmpreendimento ?? null, dadosLoteCondominio.quadra ?? null, dadosLoteCondominio.lote ?? null,
+      dadosCondominio.valorCondominio ?? null, dadosCondominio.seguranca24h ?? false, dadosCondominio.portaria ?? false, dadosCondominio.elevador ?? false, dadosCondominio.quadraEsportiva ?? false, dadosCondominio.piscina ?? false, dadosCondominio.salaoDeFestas ?? false, dadosCondominio.churrasqueira ?? false, dadosCondominio.playground ?? false, dadosCondominio.academia ?? false, dadosCondominio.vagasVisitante ?? false, dadosCondominio.salaCinema ?? false, dadosCondominio.hortaComunitaria ?? false, dadosCondominio.areaGourmetChurrasqueira ?? false, dadosCondominio.miniMercado ?? false, dadosCondominio.portariaRemota ?? false, dadosCondominio.coworking ?? false,
+      dadosRural.rio ?? false, dadosRural.piscina ?? false, dadosRural.represa ?? false, dadosRural.lago ?? false, dadosRural.curral ?? false, dadosRural.estabulo ?? false, dadosRural.galinheiro ?? false, dadosRural.pocilga ?? false, dadosRural.silo ?? false, dadosRural.terraceamento ?? false, dadosRural.energia ?? false, dadosRural.agua ?? false, dadosRural.acessoAsfalto ?? false, dadosRural.casariao ?? false, dadosRural.areaAlqueires ?? null, dadosRural.tipoAlqueire ?? null, dadosRural.valorItr ?? null,
+      tipologia.tipoVenda ?? 'Venda', tipologia.aceitaPermuta ?? false, tipologia.aceitaFinanciamento ?? false,
+      fotosJson, proprietario.nome ?? null, proprietario.cpf ?? null, proprietario.telefone ?? null, proprietario.email ?? null,
       id
     );
 
@@ -593,6 +591,23 @@ app.post('/api/send-lead', async (req, res) => {
     console.error('Erro ao enviar e-mail:', error);
     res.status(500).json({ error: 'Falha ao enviar e-mail', detail: String(error) });
   }
+});
+
+// Middleware de tratamento de erros centralizado
+app.use((err, req, res, next) => {
+  console.error('❌ Erro NÃO TRATADO:', err.stack || err);
+
+  // Não vazar detalhes do erro em produção
+  const errorMessage = process.env.NODE_ENV === 'production' 
+    ? 'Ocorreu um erro interno no servidor.' 
+    : err.message;
+  
+  const errorDetails = process.env.NODE_ENV === 'production' ? {} : { stack: err.stack, name: err.name };
+
+  res.status(err.statusCode || 500).json({
+    error: errorMessage,
+    ...errorDetails
+  });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
