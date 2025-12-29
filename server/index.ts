@@ -28,7 +28,7 @@ if (process.env.DATABASE_URL) {
 }
 
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = Number(process.env.PORT) || 4000;
 
 // CORS configurado para produção
 const allowedOrigins = [
@@ -40,14 +40,11 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) {
+    // Permite requisições sem 'origin' (ex: apps mobile, Postman) ou se a origem estiver na lista.
+    if (!origin || allowedOrigins.some(allowed => allowed && origin.includes(allowed))) {
       return callback(null, true);
     }
-    if (allowedOrigins.some(allowed => origin.includes(allowed))) {
-      return callback(null, true);
-    }
-    // Block other origins
+    // Bloqueia outras origens
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true
@@ -268,7 +265,7 @@ const gerarProximoId = async (tipo: string) => {
   }
   
   // Extrai o número do último ID e incrementa
-  const ultimoNumero = parseInt(ultimoImovel.id.substring(prefixo.length)) || 0;
+  const ultimoNumero = parseInt((ultimoImovel as { id: string }).id.substring(prefixo.length)) || 0;
   const proximoNumero = ultimoNumero + 1;
   const numeroFormatado = String(proximoNumero).padStart(3, '0');
   

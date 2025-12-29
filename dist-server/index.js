@@ -26,7 +26,7 @@ else {
     }
 }
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = Number(process.env.PORT) || 4000;
 // CORS configurado para produção
 const allowedOrigins = [
     'http://localhost:5173',
@@ -36,14 +36,11 @@ const allowedOrigins = [
 ].filter(Boolean);
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) {
+        // Permite requisições sem 'origin' (ex: apps mobile, Postman) ou se a origem estiver na lista.
+        if (!origin || allowedOrigins.some(allowed => allowed && origin.includes(allowed))) {
             return callback(null, true);
         }
-        if (allowedOrigins.some(allowed => origin.includes(allowed))) {
-            return callback(null, true);
-        }
-        // Block other origins
+        // Bloqueia outras origens
         callback(new Error('Not allowed by CORS'));
     },
     credentials: true
