@@ -7,7 +7,9 @@
     "npm": ">=10.0.0"
   },
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"npm:dev:*\"",
+    "dev:client": "vite",
+    "dev:server": "tsx watch server/index.ts",
     "build": "npm run build:frontend && npm run build:server",
     "build:frontend": "tsc && vite build",
     "build:server": "tsc -p tsconfig.server.json",
@@ -30,6 +32,8 @@
     "react-router-dom": "^6.20.1"
   },
   "devDependencies": {
+    "concurrently": "^8.2.2",
+    "tsx": "^4.7.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

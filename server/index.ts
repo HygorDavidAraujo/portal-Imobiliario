@@ -337,6 +337,20 @@ app.get('/api/imoveis/:id', async (req: Request, res: Response) => {
 app.post('/api/imoveis', async (req: Request, res: Response) => {
   try {
     const imovel = req.body;
+
+    // --- Validação ---
+    const camposObrigatorios = ['titulo', 'categoria', 'tipo', 'preco'];
+    const camposFaltantes = camposObrigatorios.filter(campo => 
+      imovel[campo] === null || imovel[campo] === undefined || imovel[campo] === ''
+    );
+
+    if (camposFaltantes.length > 0) {
+      return res.status(400).json({ 
+        error: `Campos obrigatórios faltando: ${camposFaltantes.join(', ')}.` 
+      });
+    }
+    // --- Fim da Validação ---
+
     const fotosJson = JSON.stringify(imovel.fotos || []);
 
     const novoId = await gerarProximoId(imovel.tipo);

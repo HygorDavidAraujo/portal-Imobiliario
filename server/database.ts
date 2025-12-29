@@ -5,10 +5,33 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const dbPath = path.resolve(__dirname, '../portal_imobiliario.db');
-const db = new Database(dbPath);
+const dbInstance = new Database(dbPath);
 
-db.pragma('journal_mode = WAL');
+dbInstance.pragma('journal_mode = WAL');
+
+const prepare = (sql: string) => {
+  const stmt = dbInstance.prepare(sql);
+  
+  const get = async (...params: any[]) => {
+    return stmt.get(...params);
+  };
+  
+  const all = async (...params: any[]) => {
+    return stmt.all(...params);
+  };
+  
+  const run = async (...params: any[]) => {
+    return stmt.run(...params);
+  };
+  
+  return { get, all, run };
+};
+
+const db = {
+  exec: (sql: string) => dbInstance.exec(sql),
+  prepare,
+};
+
 
 export const initializeDatabase = () => {
   db.exec(`
@@ -114,6 +137,8 @@ export const initializeDatabase = () => {
     CREATE TABLE IF NOT EXISTS leads (
       id TEXT PRIMARY KEY,
       imovelId TEXT NOT NULL,
+      imovelTitulo TEXT,
+      mensagem TEXT,
       nomeCliente TEXT NOT NULL,
       telefoneCliente TEXT NOT NULL,
       emailCliente TEXT NOT NULL,
@@ -130,6 +155,13 @@ export const initializeDatabase = () => {
       criadoEm DATETIME DEFAULT CURRENT_TIMESTAMP
     );
     
+    CREATE TRIGGER IF NOT EXISTS update_imoveis_atualizadoEm
+    AFTER UPDATE ON imoveis
+    FOR EACH ROW
+    BEGIN
+        UPDATE imoveis SET atualizadoEm = CURRENT_TIMESTAMP WHERE id = OLD.id;
+    END;
+
     CREATE INDEX IF NOT EXISTS idx_imoveis_categoria ON imoveis(categoria);
     CREATE INDEX IF NOT EXISTS idx_imoveis_tipo ON imoveis(tipo);
     CREATE INDEX IF NOT EXISTS idx_imoveis_ativo ON imoveis(ativo);
