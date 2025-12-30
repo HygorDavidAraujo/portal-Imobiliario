@@ -149,6 +149,7 @@ model Lead {
   
   @@index([imovelId])
   @@index([visualizado])
+  @@map("leads")
 }
 
 model ContatoCliente {
