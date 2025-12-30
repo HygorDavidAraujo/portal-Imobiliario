@@ -35,6 +35,8 @@ const PORT = Number(process.env.PORT) || 4000;
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
+  'https://portal-imobiliario-production.up.railway.app',
+  'https://portal-imobiliario-vert.vercel.app',
   process.env.FRONTEND_URL,
   process.env.VERCEL_URL
 ].filter(Boolean);
