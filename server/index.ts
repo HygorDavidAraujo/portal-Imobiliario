@@ -256,11 +256,12 @@ const obterPrefixoTipo = (tipo: string) => {
 const gerarProximoId = async (tipo: string) => {
   const prefixo = obterPrefixoTipo(tipo);
   
-  const ultimoImovel = await db.prisma.imovel.findFirst({
+    if (!db.prisma) throw new Error('Prisma client não está disponível. Verifique a configuração do banco de dados.');
+    const ultimoImovel = await db.prisma.imovel.findFirst({
       where: { id: { startsWith: prefixo } },
       orderBy: { id: 'desc' },
       select: { id: true },
-  });
+    });
   
   if (!ultimoImovel) {
     // Primeiro imóvel deste tipo
@@ -479,6 +480,7 @@ app.post('/api/imoveis', async (req: Request, res: Response) => {
         }
     });
 
+    if (!db.prisma) throw new Error('Prisma client não está disponível. Verifique a configuração do banco de dados.');
     await db.prisma.imovel.create({ data: dataToCreate });
 
     console.log(`✅ Imóvel criado: ${novoId}`);
