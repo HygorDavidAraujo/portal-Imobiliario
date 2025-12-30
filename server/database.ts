@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const dbPath = path.join(__dirname, '..', 'portal_imobiliario.db');
 const dbInstance = new Database(dbPath);
 
 dbInstance.pragma('journal_mode = WAL');
