@@ -487,7 +487,15 @@ app.post('/api/imoveis', async (req: Request, res: Response) => {
     res.json({ id: novoId });
   } catch (error) {
     console.error('Erro detalhado ao criar imóvel:', error);
-    res.status(500).json({ error: 'Erro ao criar imóvel', detail: error.message });
+    let detail = '';
+    if (error instanceof Error) {
+      detail = error.message;
+    } else if (typeof error === 'object' && error !== null && 'message' in error) {
+      detail = String((error as any).message);
+    } else {
+      detail = String(error);
+    }
+    res.status(500).json({ error: 'Erro ao criar imóvel', detail });
   }
 });
 
