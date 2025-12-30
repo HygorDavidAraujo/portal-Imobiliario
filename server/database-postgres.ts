@@ -234,6 +234,7 @@ const prepare = (sql: string) => {
 
 const db = {
   prepare,
+  prisma,
 };
 
 // Exporta o objeto 'db' compatível para ser usado no index.js
