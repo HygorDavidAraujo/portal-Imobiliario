@@ -31,6 +31,7 @@ const prepare = (sql: string) => {
 const db = {
   exec: (sql: string) => dbInstance.exec(sql),
   prepare,
+  prisma: undefined, // Garante compatibilidade com uso de db.prisma
 };
 
 
