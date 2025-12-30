@@ -134,6 +134,7 @@ model Imovel {
 model Lead {
   id                    String   @id @default(cuid())
   imovelId              String
+  imovelTitulo          String
   imovel                Imovel   @relation(fields: [imovelId], references: [id], onDelete: Cascade)
   
   // Cliente
