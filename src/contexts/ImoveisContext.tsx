@@ -59,7 +59,9 @@ export const ImoveisProvider: React.FC<ImoveisProviderProps> = ({ children }) =>
     let errorMessage = defaultMessage;
     try {
       const errorData = await response.json();
-      if (errorData && errorData.error) {
+      if (errorData && errorData.detail) {
+        errorMessage = errorData.detail;
+      } else if (errorData && errorData.error) {
         errorMessage = errorData.error;
       } else if (errorData && errorData.message) {
         errorMessage = errorData.message;

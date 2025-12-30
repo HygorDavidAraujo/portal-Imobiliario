@@ -17,9 +17,10 @@ export const formatarValorBrasileiro = (valor: number | string): string => {
 };
 
 export const converterValorBrasileiroParaNumero = (valor: string): number => {
+  if (!valor) return NaN;
   // Remove pontos (separador de milhar) e substitui vírgula por ponto (decimal)
   const valorLimpo = valor.replace(/\./g, '').replace(',', '.');
-  return parseFloat(valorLimpo) || 0;
+  return parseFloat(valorLimpo);
 };
 
 export const formatarCEP = (cep: string): string => {

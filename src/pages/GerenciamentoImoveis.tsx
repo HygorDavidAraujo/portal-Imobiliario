@@ -264,7 +264,7 @@ export const GerenciamentoImoveis: React.FC = () => {
     if (!titulo.trim()) novosErros.push('Título é obrigatório');
     if (!descricao.trim()) novosErros.push('Descrição é obrigatória');
     const precoNumerico = converterValorBrasileiroParaNumero(preco);
-    if (!preco || precoNumerico <= 0) novosErros.push('Preço deve ser maior que zero');
+    if (Number.isNaN(precoNumerico) || precoNumerico <= 0) novosErros.push('Preço deve ser maior que zero');
     
     if (fotos.length < 4) novosErros.push('Adicione no mínimo 4 fotos');
     
@@ -311,6 +311,8 @@ export const GerenciamentoImoveis: React.FC = () => {
       preco: 0,
     } as Imovel;
 
+    const sanitize = (num: number) => (Number.isNaN(num) ? undefined : num);
+
     const imovelFinal: Imovel = {
       ...baseImovel,
       id: id || baseImovel.id,
@@ -318,20 +320,20 @@ export const GerenciamentoImoveis: React.FC = () => {
       tipo,
       titulo,
       descricao,
-      preco: converterValorBrasileiroParaNumero(preco),
+      preco: converterValorBrasileiroParaNumero(preco), // Already validated
       endereco: {
         ...baseImovel.endereco,
         logradouro, numero, complemento, bairro, cidade, estado, cep,
       },
       fichaTecnica: {
         ...baseImovel.fichaTecnica,
-        areaTotal: areaTotal ? parseFloat(areaTotal) : undefined,
-        areaConstruida: areaConstruida ? parseFloat(areaConstruida) : undefined,
-        quartos: quartos ? parseInt(quartos) : undefined,
-        suites: suites ? parseInt(suites) : undefined,
-        banheiros: banheiros ? parseInt(banheiros) : undefined,
-        vagasGaragem: vagasGaragem ? parseInt(vagasGaragem) : undefined,
-        anoConstructao: anoConstructao ? parseInt(anoConstructao) : undefined,
+        areaTotal: sanitize(parseFloat(areaTotal)),
+        areaConstruida: sanitize(parseFloat(areaConstruida)),
+        quartos: sanitize(parseInt(quartos)),
+        suites: sanitize(parseInt(suites)),
+        banheiros: sanitize(parseInt(banheiros)),
+        vagasGaragem: sanitize(parseInt(vagasGaragem)),
+        anoConstructao: sanitize(parseInt(anoConstructao)),
         mobiliado,
         escritorio,
         lavabo,
@@ -341,8 +343,8 @@ export const GerenciamentoImoveis: React.FC = () => {
         varandaGourmet,
         piscinaPrivativa,
         churrasqueiraPrivativa,
-        valorIptu: valorIptu ? converterValorBrasileiroParaNumero(valorIptu) : undefined,
-        valorItu: valorItu ? converterValorBrasileiroParaNumero(valorItu) : undefined,
+        valorIptu: sanitize(converterValorBrasileiroParaNumero(valorIptu)),
+        valorItu: sanitize(converterValorBrasileiroParaNumero(valorItu)),
       },
       tipologia: {
         ...baseImovel.tipologia,
@@ -377,7 +379,7 @@ export const GerenciamentoImoveis: React.FC = () => {
 
     if (tipo.includes('Condomínio') || tipo === 'Apartamento') {
       imovelFinal.dadosCondominio = {
-        valorCondominio: valorCondominio ? converterValorBrasileiroParaNumero(valorCondominio) : undefined,
+        valorCondominio: sanitize(converterValorBrasileiroParaNumero(valorCondominio)),
         seguranca24h, portaria, elevador, quadraEsportiva, piscina, salaoDeFestas,
         churrasqueira, playground, academia, vagasVisitante, salaCinema, hortaComunitaria,
         areaGourmetChurrasqueira, miniMercado, portariaRemota, coworking,
@@ -390,9 +392,9 @@ export const GerenciamentoImoveis: React.FC = () => {
       imovelFinal.dadosRural = {
         rio, piscina: piscinaRural, represa, lago, curral, estabulo, galinheiro, pocilga,
         silo, terraceamento, energia, agua, acessoAsfalto, casariao,
-        areaAlqueires: parseFloat(areaAlqueires) || undefined,
+        areaAlqueires: sanitize(parseFloat(areaAlqueires)),
         tipoAlqueire,
-        valorItr: valorItr ? converterValorBrasileiroParaNumero(valorItr) : undefined,
+        valorItr: sanitize(converterValorBrasileiroParaNumero(valorItr)),
       };
     } else {
       delete imovelFinal.dadosRural;

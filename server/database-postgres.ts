@@ -132,7 +132,7 @@ const prepare = (sql: string) => {
     if (upperSql.startsWith('SELECT * FROM IMOVEIS WHERE ID = ?')) {
       return prisma.imovel.findUnique({ where: { id: params[0] } });
     }
-    if (upperSql.startsWith("SELECT ID FROM IMOVEIS WHERE ID LIKE '")) {
+    if (upperSql.includes("SELECT ID FROM IMOVEIS WHERE ID LIKE '")) {
         const match = sql.match(/'([^']*)%'/);
         const prefix = match ? match[1] : null;
         if (!prefix) {
