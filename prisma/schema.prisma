@@ -113,10 +113,6 @@ model Imovel {
   fotos                 String    @default("[]") // JSON array
   
   // Owner
-  datasource db {
-    provider = "postgresql"
-    url      = env("DATABASE_URL")
-  }
   nomeDono              String?
   cpfDono               String?
   telefoneDono          String?
