@@ -46,7 +46,37 @@ function hashOtp(otp: string) {
 
 // Envio real: agora por e-mail
 async function sendOtpViaEmail(otp: string, email: string) {
-  // Usa variáveis de ambiente já existentes
+  const subject = 'Seu código de acesso administrativo';
+  const text = `Seu código de acesso ao Portal Imobiliário: ${otp}`;
+  const html = `<p>Seu código de acesso ao <b>Portal Imobiliário</b>:</p><h2>${otp}</h2>`;
+
+  // Prefer Resend API for cloud reliability
+  if (process.env.RESEND_API_KEY) {
+    const mailFrom = process.env.MAIL_FROM || process.env.MAIL_USER || 'onboarding@resend.dev';
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: mailFrom,
+        to: email,
+        subject,
+        html,
+      }),
+    });
+    if (response.ok) {
+      console.log('OTP enviado por Resend API');
+      return;
+    } else {
+      const detail = await response.text();
+      console.error('Resend falhou:', detail);
+      // Continua para tentar SMTP abaixo
+    }
+  }
+
+  // Fallback para SMTP local
   const transporter = nodemailer.createTransport({
     host: process.env.MAIL_HOST,
     port: Number(process.env.MAIL_PORT),
@@ -59,11 +89,11 @@ async function sendOtpViaEmail(otp: string, email: string) {
   const info = await transporter.sendMail({
     from: `Portal Imobiliário <${process.env.MAIL_USER}>`,
     to: email,
-    subject: 'Seu código de acesso administrativo',
-    text: `Seu código de acesso ao Portal Imobiliário: ${otp}`,
-    html: `<p>Seu código de acesso ao <b>Portal Imobiliário</b>:</p><h2>${otp}</h2>`,
+    subject,
+    text,
+    html,
   });
-  console.log('OTP enviado por e-mail:', info.messageId);
+  console.log('OTP enviado por SMTP:', info.messageId);
 }
 
 // Rate limit básico: impede spam de envio
