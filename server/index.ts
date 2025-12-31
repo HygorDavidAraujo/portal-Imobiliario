@@ -13,14 +13,7 @@ dotenv.config();
 const app = express();
 
 // ==================== CORS PRIMEIRO ====================
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'https://portal-imobiliario-production.up.railway.app',
-  'https://portal-imobiliario-vert.vercel.app',
-  process.env.FRONTEND_URL,
-  process.env.VERCEL_URL
-].filter(Boolean);
+// (Removido: duplicidade de allowedOrigins)
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.some(allowed => allowed && origin.includes(allowed))) {
