@@ -5,6 +5,17 @@ import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 dotenv.config();
 const app = express();
+// ==================== CORS PRIMEIRO ====================
+// (Removido: duplicidade de allowedOrigins)
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.some(allowed => allowed && origin.includes(allowed))) {
+            return callback(null, true);
+        }
+        callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true
+}));
 // ==================== LOGIN ADMIN OTP ====================
 const ADMIN_PHONE = '+5562981831483';
 const OTP_EXPIRATION = 60 * 1000; // 60 segundos
