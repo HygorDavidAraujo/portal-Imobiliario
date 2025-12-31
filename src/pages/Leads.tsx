@@ -141,9 +141,24 @@ export const Leads: React.FC = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
                         <div className="flex items-center gap-2 text-slate-700">
                           <Phone size={16} className="text-blue-600" />
-                          {(lead.cliente?.telefone || contatoCliente?.telefone) ? (
-                            <a href={`tel:${(lead.cliente?.telefone || contatoCliente?.telefone) ?? ''}`} className="hover:text-blue-600 transition-colors">
-                              {formatarTelefone((lead.cliente?.telefone || contatoCliente?.telefone) ?? '')}
+                          {(
+                            lead.cliente?.telefone ||
+                            lead.telefoneCliente ||
+                            contatoCliente?.telefone
+                          ) ? (
+                            <a
+                              href={`tel:${
+                                lead.cliente?.telefone ||
+                                lead.telefoneCliente ||
+                                contatoCliente?.telefone || ''
+                              }`}
+                              className="hover:text-blue-600 transition-colors"
+                            >
+                              {formatarTelefone(
+                                lead.cliente?.telefone ||
+                                lead.telefoneCliente ||
+                                contatoCliente?.telefone || ''
+                              )}
                             </a>
                           ) : (
                             <span className="text-slate-400">(sem telefone)</span>
@@ -151,9 +166,22 @@ export const Leads: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-2 text-slate-700">
                           <Mail size={16} className="text-blue-600" />
-                          {(lead.cliente?.email || contatoCliente?.email) ? (
-                            <a href={`mailto:${(lead.cliente?.email || contatoCliente?.email) ?? ''}`} className="hover:text-blue-600 transition-colors truncate">
-                              {(lead.cliente?.email || contatoCliente?.email) ?? ''}
+                          {(
+                            lead.cliente?.email ||
+                            lead.emailCliente ||
+                            contatoCliente?.email
+                          ) ? (
+                            <a
+                              href={`mailto:${
+                                lead.cliente?.email ||
+                                lead.emailCliente ||
+                                contatoCliente?.email || ''
+                              }`}
+                              className="hover:text-blue-600 transition-colors truncate"
+                            >
+                              {lead.cliente?.email ||
+                                lead.emailCliente ||
+                                contatoCliente?.email || ''}
                             </a>
                           ) : (
                             <span className="text-slate-400">(sem email)</span>
