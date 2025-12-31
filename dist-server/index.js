@@ -2,7 +2,87 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 dotenv.config();
+const app = express();
+// ==================== LOGIN ADMIN OTP ====================
+const ADMIN_PHONE = '+5562981831483';
+const OTP_EXPIRATION = 60 * 1000; // 60 segundos
+const OTP_ATTEMPT_LIMIT = 5;
+let adminOtp = null;
+let lastOtpSentAt = 0;
+function generateOtp() {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+}
+function hashOtp(otp) {
+    return crypto.createHash('sha256').update(otp + process.env.OTP_SECRET).digest('hex');
+}
+// Envio real: agora por e-mail
+async function sendOtpViaEmail(otp, email) {
+    // Usa variáveis de ambiente já existentes
+    const transporter = nodemailer.createTransport({
+        host: process.env.MAIL_HOST,
+        port: Number(process.env.MAIL_PORT),
+        secure: true,
+        auth: {
+            user: process.env.MAIL_USER,
+            pass: process.env.MAIL_PASS,
+        },
+    });
+    const info = await transporter.sendMail({
+        from: `Portal Imobiliário <${process.env.MAIL_USER}>`,
+        to: email,
+        subject: 'Seu código de acesso administrativo',
+        text: `Seu código de acesso ao Portal Imobiliário: ${otp}`,
+        html: `<p>Seu código de acesso ao <b>Portal Imobiliário</b>:</p><h2>${otp}</h2>`,
+    });
+    console.log('OTP enviado por e-mail:', info.messageId);
+}
+// Rate limit básico: impede spam de envio
+app.post('/api/admin/send-otp', async (req, res) => {
+    const now = Date.now();
+    if (now - lastOtpSentAt < 5000) {
+        return res.status(429).json({ error: 'Aguarde alguns segundos para reenviar.' });
+    }
+    const otp = generateOtp();
+    const hash = hashOtp(otp);
+    adminOtp = {
+        hash,
+        expires: now + OTP_EXPIRATION,
+        attempts: 0,
+    };
+    lastOtpSentAt = now;
+    try {
+        await sendOtpViaEmail(otp, process.env.MAIL_TO || 'hygordavidaraujo@gmail.com');
+    }
+    catch (e) {
+        console.error('Erro ao enviar e-mail:', e);
+        return res.status(500).json({ error: 'Erro ao enviar e-mail.' });
+    }
+    res.json({ ok: true });
+});
+// Validação do OTP
+app.post('/api/admin/validate-otp', express.json(), (req, res) => {
+    const { otp } = req.body || {};
+    if (!otp || typeof otp !== 'string' || otp.length !== 6) {
+        return res.status(400).json({ error: 'Código inválido.' });
+    }
+    if (!adminOtp || Date.now() > adminOtp.expires) {
+        adminOtp = null;
+        return res.status(400).json({ error: 'Código expirado. Solicite um novo.' });
+    }
+    if (adminOtp.attempts >= OTP_ATTEMPT_LIMIT) {
+        adminOtp = null;
+        return res.status(429).json({ error: 'Muitas tentativas. Solicite um novo código.' });
+    }
+    adminOtp.attempts++;
+    if (hashOtp(otp) !== adminOtp.hash) {
+        return res.status(400).json({ error: 'Código incorreto.' });
+    }
+    // Sucesso: invalida o código
+    adminOtp = null;
+    res.json({ ok: true });
+});
 // Escolhe o banco baseado na variável de ambiente
 let db, initializeDatabase;
 if (process.env.DATABASE_URL) {
@@ -26,7 +106,7 @@ else {
         throw new Error('Configure DATABASE_URL para usar PostgreSQL');
     }
 }
-const app = express();
+// const app = express(); // Removido duplicidade
 const PORT = Number(process.env.PORT) || 4000;
 // CORS configurado para produção
 const allowedOrigins = [
@@ -202,10 +282,24 @@ const mapRowToLead = (row) => {
     const id = String(row.id || '');
     const imovelId = String(row.imovelId || row.imovelid || '');
     const imovelTitulo = String(row.imovelTitulo || row.imoveltitulo || row.titulo || '');
-    // Busca também as versões minúsculas dos campos (compatível com PostgreSQL)
-    const clienteNome = String(row.clienteNome || row.nomeCliente || row.clientenome || row.nomecliente || row.nome || '');
-    const clienteEmail = String(row.clienteEmail || row.emailCliente || row.clienteemail || row.emailcliente || row.email || '');
-    const clienteTelefone = String(row.clienteTelefone || row.telefoneCliente || row.clientetelefone || row.telefonecliente || row.telefone || '');
+    // Corrigir para pegar nome, email e telefone do lead, independente do nome do campo
+    // Prioriza os campos do banco: nomeCliente, emailCliente, telefoneCliente
+    // Log para debug dos campos recebidos do banco
+    console.log('DEBUG LEAD ROW:', {
+        nomeCliente: row.nomeCliente,
+        clienteNome: row.clienteNome,
+        nomecliente: row.nomecliente,
+        emailCliente: row.emailCliente,
+        clienteEmail: row.clienteEmail,
+        emailcliente: row.emailcliente,
+        telefoneCliente: row.telefoneCliente,
+        clienteTelefone: row.clienteTelefone,
+        telefonecliente: row.telefonecliente,
+    });
+    // Garante que pega os campos minúsculos do PostgreSQL
+    const clienteNome = String(row.nomeCliente || row.clienteNome || row.nomecliente || row.clientenome || row.nome || '');
+    const clienteEmail = String(row.emailCliente || row.clienteEmail || row.emailcliente || row.clienteemail || row.email || '');
+    const clienteTelefone = String(row.telefoneCliente || row.clienteTelefone || row.telefonecliente || row.clientetelefone || row.telefone || '');
     const mensagem = String((row.mensagem ?? '') || '');
     const created = row.data || row.criadoEm || row.criadoem;
     const data = created ? new Date(created) : new Date();
