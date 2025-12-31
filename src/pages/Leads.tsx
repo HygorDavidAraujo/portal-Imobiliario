@@ -97,9 +97,9 @@ export const Leads: React.FC = () => {
             {leads.map((lead) => {
               const imovel = obterImovel(lead.imovelId);
               // Busca direto dos campos do banco, sem depender do objeto cliente
-              const nome = lead.nomeCliente || lead.clienteNome || (lead.cliente && lead.cliente.nome) || '(sem nome)';
-              const telefone = lead.telefoneCliente || lead.clienteTelefone || (lead.cliente && lead.cliente.telefone) || '';
-              const email = lead.emailCliente || lead.clienteEmail || (lead.cliente && lead.cliente.email) || '';
+              const nome = (lead as any).nomeCliente || (lead as any).clienteNome || (lead.cliente && lead.cliente.nome) || '(sem nome)';
+              const telefone = (lead as any).telefoneCliente || (lead as any).clienteTelefone || (lead.cliente && lead.cliente.telefone) || '';
+              const email = (lead as any).emailCliente || (lead as any).clienteEmail || (lead.cliente && lead.cliente.email) || '';
               return (
                 <div
                   key={lead.id}
