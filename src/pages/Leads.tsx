@@ -143,20 +143,20 @@ export const Leads: React.FC = () => {
                           <Phone size={16} className="text-blue-600" />
                           {(
                             lead.cliente?.telefone ||
-                            lead.telefoneCliente ||
+                            lead['telefoneCliente'] ||
                             contatoCliente?.telefone
                           ) ? (
                             <a
                               href={`tel:${
                                 lead.cliente?.telefone ||
-                                lead.telefoneCliente ||
+                                lead['telefoneCliente'] ||
                                 contatoCliente?.telefone || ''
                               }`}
                               className="hover:text-blue-600 transition-colors"
                             >
                               {formatarTelefone(
                                 lead.cliente?.telefone ||
-                                lead.telefoneCliente ||
+                                lead['telefoneCliente'] ||
                                 contatoCliente?.telefone || ''
                               )}
                             </a>
@@ -168,19 +168,19 @@ export const Leads: React.FC = () => {
                           <Mail size={16} className="text-blue-600" />
                           {(
                             lead.cliente?.email ||
-                            lead.emailCliente ||
+                            lead['emailCliente'] ||
                             contatoCliente?.email
                           ) ? (
                             <a
                               href={`mailto:${
                                 lead.cliente?.email ||
-                                lead.emailCliente ||
+                                lead['emailCliente'] ||
                                 contatoCliente?.email || ''
                               }`}
                               className="hover:text-blue-600 transition-colors truncate"
                             >
                               {lead.cliente?.email ||
-                                lead.emailCliente ||
+                                lead['emailCliente'] ||
                                 contatoCliente?.email || ''}
                             </a>
                           ) : (
