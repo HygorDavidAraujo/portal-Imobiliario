@@ -96,6 +96,10 @@ export const Leads: React.FC = () => {
           <div className="space-y-4">
             {leads.map((lead) => {
               const imovel = obterImovel(lead.imovelId);
+              // Busca direto dos campos do banco, sem depender do objeto cliente
+              const nome = lead.nomeCliente || lead.clienteNome || (lead.cliente && lead.cliente.nome) || '(sem nome)';
+              const telefone = lead.telefoneCliente || lead.clienteTelefone || (lead.cliente && lead.cliente.telefone) || '';
+              const email = lead.emailCliente || lead.clienteEmail || (lead.cliente && lead.cliente.email) || '';
               return (
                 <div
                   key={lead.id}
@@ -129,7 +133,7 @@ export const Leads: React.FC = () => {
                             </span>
                           )}
                           <h3 className="text-xl font-bold text-slate-800 mb-1">
-                            {lead.cliente?.nome || contatoCliente?.nome || '(sem nome)'}
+                            {nome}
                           </h3>
                           <div className="flex items-center gap-2 text-slate-600 text-sm mb-2">
                             <Calendar size={16} />
@@ -141,24 +145,12 @@ export const Leads: React.FC = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
                         <div className="flex items-center gap-2 text-slate-700">
                           <Phone size={16} className="text-blue-600" />
-                          {(
-                            lead.cliente?.telefone ||
-                            (lead as any).telefoneCliente ||
-                            contatoCliente?.telefone
-                          ) ? (
+                          {telefone ? (
                             <a
-                              href={`tel:${
-                                lead.cliente?.telefone ||
-                                (lead as any).telefoneCliente ||
-                                contatoCliente?.telefone || ''
-                              }`}
+                              href={`tel:${telefone}`}
                               className="hover:text-blue-600 transition-colors"
                             >
-                              {formatarTelefone(
-                                lead.cliente?.telefone ||
-                                (lead as any).telefoneCliente ||
-                                contatoCliente?.telefone || ''
-                              )}
+                              {formatarTelefone(telefone)}
                             </a>
                           ) : (
                             <span className="text-slate-400">(sem telefone)</span>
@@ -166,22 +158,12 @@ export const Leads: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-2 text-slate-700">
                           <Mail size={16} className="text-blue-600" />
-                          {(
-                            lead.cliente?.email ||
-                            (lead as any).emailCliente ||
-                            contatoCliente?.email
-                          ) ? (
+                          {email ? (
                             <a
-                              href={`mailto:${
-                                lead.cliente?.email ||
-                                (lead as any).emailCliente ||
-                                contatoCliente?.email || ''
-                              }`}
+                              href={`mailto:${email}`}
                               className="hover:text-blue-600 transition-colors truncate"
                             >
-                              {lead.cliente?.email ||
-                                (lead as any).emailCliente ||
-                                contatoCliente?.email || ''}
+                              {email}
                             </a>
                           ) : (
                             <span className="text-slate-400">(sem email)</span>
