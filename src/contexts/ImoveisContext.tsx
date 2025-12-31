@@ -100,8 +100,8 @@ export const ImoveisProvider: React.FC<ImoveisProviderProps> = ({ children }) =>
           ...lead,
           cliente: lead.cliente || {
             nome: lead.clienteNome || lead.nomeCliente || '',
-            email: lead.clienteEmail || '',
-            telefone: lead.clienteTelefone || '',
+            email: lead.clienteEmail || lead.emailCliente || '',
+            telefone: lead.clienteTelefone || lead.telefoneCliente || '',
           },
           imovelTitulo: lead.imovelTitulo || lead.titulo || '',
           data: lead.data
