@@ -10,6 +10,7 @@ if (process.env.DATABASE_URL) {
     console.log('🐘 Usando PostgreSQL');
     const dbModule = await import('./database-postgres.js');
     db = dbModule.default;
+    db.prisma = dbModule.prisma; // Make prisma client available
     initializeDatabase = dbModule.initializeDatabase;
 }
 else {
@@ -31,6 +32,8 @@ const PORT = Number(process.env.PORT) || 4000;
 const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:3000',
+    'https://portal-imobiliario-production.up.railway.app',
+    'https://portal-imobiliario-vert.vercel.app',
     process.env.FRONTEND_URL,
     process.env.VERCEL_URL
 ].filter(Boolean);
@@ -246,9 +249,13 @@ const obterPrefixoTipo = (tipo) => {
 // Gera próximo ID sequencial para o tipo de imóvel
 const gerarProximoId = async (tipo) => {
     const prefixo = obterPrefixoTipo(tipo);
-    // Busca o último ID com esse prefixo
-    const query = `SELECT id FROM imoveis WHERE id LIKE '${prefixo}%' ORDER BY id DESC LIMIT 1`;
-    const ultimoImovel = await db.prepare(query).get();
+    if (!db.prisma)
+        throw new Error('Prisma client não está disponível. Verifique a configuração do banco de dados.');
+    const ultimoImovel = await db.prisma.imovel.findFirst({
+        where: { id: { startsWith: prefixo } },
+        orderBy: { id: 'desc' },
+        select: { id: true },
+    });
     if (!ultimoImovel) {
         // Primeiro imóvel deste tipo
         return `${prefixo}001`;
@@ -319,38 +326,137 @@ app.get('/api/imoveis/:id', async (req, res) => {
 app.post('/api/imoveis', async (req, res) => {
     try {
         const imovel = req.body;
-        const fotosJson = JSON.stringify(imovel.fotos || []);
+        // --- Validação ---
+        const camposObrigatorios = ['titulo', 'categoria', 'tipo', 'preco'];
+        const camposFaltantes = camposObrigatorios.filter(campo => imovel[campo] === null || imovel[campo] === undefined || imovel[campo] === '');
+        if (camposFaltantes.length > 0) {
+            return res.status(400).json({
+                error: `Campos obrigatórios faltando: ${camposFaltantes.join(', ')}.`,
+                detail: `Campos obrigatórios faltando: ${camposFaltantes.join(', ')}.`
+            });
+        }
+        // --- Fim da Validação ---
         const novoId = await gerarProximoId(imovel.tipo);
         console.log(`📝 Gerando novo imóvel: ${novoId} (${imovel.tipo})`);
-        const endereco = imovel.endereco || {};
-        const fichaTecnica = imovel.fichaTecnica || {};
-        const dadosApartamento = imovel.dadosApartamento || {};
-        const dadosLoteCondominio = imovel.dadosLoteCondominio || {};
-        const dadosCondominio = imovel.dadosCondominio || {};
-        const dadosRural = imovel.dadosRural || {};
-        const tipologia = imovel.tipologia || {};
-        const proprietario = imovel.proprietario || imovel.infoDono || {};
-        const stmt = db.prepare(`
-      INSERT INTO imoveis (
-        id, titulo, descricao, categoria, tipo, preco, ativo,
-        endereco_logradouro, endereco_numero, endereco_bairro, endereco_cidade, endereco_estado, endereco_cep, endereco_complemento,
-        quartos, suites, banheiros, vagasGaragem, areaTotal, areaConstruida, anoConstructao, mobiliado, valorIptu, valorItu,
-        escritorio, lavabo, despensa, areaServico, jardim, varandaGourmet, piscinaPrivativa, churrasqueiraPrivativa,
-        numeroApartamento, andar, blocoTorre, nomeEmpreendimento, elevador, fachada,
-        nomeEmpreendimentoLote, quadraLote, loteLote,
-        valorCondominio, seguranca24h, portaria, elevadorCondominio, quadraEsportiva, piscina, salaoDeFestas, churrasqueira, playground, academia, vagasVisitante, salaCinema, hortaComunitaria, areaGourmetChurrasqueira, miniMercado, portariaRemota, coworking,
-        rio, piscinaRural, represa, lago, curral, estabulo, galinheiro, pocilga, silo, terraceamento, energia, agua, acessoAsfalto, casariao, areaAlqueires, tipoAlqueire, valorItr,
-        tipoVenda, aceitaPermuta, aceitaFinanciamento,
-        fotos, nomeDono, cpfDono, telefoneDono, emailDono
-      ) VALUES (${Array(83).fill('?').join(', ')})
-    `);
-        await stmt.run(novoId, imovel.titulo ?? null, imovel.descricao ?? null, imovel.categoria ?? null, imovel.tipo ?? null, imovel.preco ?? null, imovel.ativo ?? true, endereco.logradouro ?? null, endereco.numero ?? null, endereco.bairro ?? null, endereco.cidade ?? null, endereco.estado ?? null, endereco.cep ?? null, endereco.complemento ?? null, fichaTecnica.quartos ?? null, fichaTecnica.suites ?? null, fichaTecnica.banheiros ?? null, fichaTecnica.vagasGaragem ?? null, fichaTecnica.areaTotal ?? null, fichaTecnica.areaConstruida ?? null, fichaTecnica.anoConstructao ?? null, fichaTecnica.mobiliado ?? false, fichaTecnica.valorIptu ?? null, fichaTecnica.valorItu ?? null, fichaTecnica.escritorio ?? false, fichaTecnica.lavabo ?? false, fichaTecnica.despensa ?? false, fichaTecnica.areaServico ?? false, fichaTecnica.jardim ?? false, fichaTecnica.varandaGourmet ?? false, fichaTecnica.piscinaPrivativa ?? false, fichaTecnica.churrasqueiraPrivativa ?? false, dadosApartamento.numeroApartamento ?? null, dadosApartamento.andar ?? null, dadosApartamento.blocoTorre ?? null, dadosApartamento.nomeEmpreendimento ?? null, dadosApartamento.elevador ?? false, dadosApartamento.fachada ?? null, dadosLoteCondominio.nomeEmpreendimento ?? null, dadosLoteCondominio.quadra ?? null, dadosLoteCondominio.lote ?? null, dadosCondominio.valorCondominio ?? null, dadosCondominio.seguranca24h ?? false, dadosCondominio.portaria ?? false, dadosCondominio.elevador ?? false, dadosCondominio.quadraEsportiva ?? false, dadosCondominio.piscina ?? false, dadosCondominio.salaoDeFestas ?? false, dadosCondominio.churrasqueira ?? false, dadosCondominio.playground ?? false, dadosCondominio.academia ?? false, dadosCondominio.vagasVisitante ?? false, dadosCondominio.salaCinema ?? false, dadosCondominio.hortaComunitaria ?? false, dadosCondominio.areaGourmetChurrasqueira ?? false, dadosCondominio.miniMercado ?? false, dadosCondominio.portariaRemota ?? false, dadosCondominio.coworking ?? false, dadosRural.rio ?? false, dadosRural.piscina ?? false, dadosRural.represa ?? false, dadosRural.lago ?? false, dadosRural.curral ?? false, dadosRural.estabulo ?? false, dadosRural.galinheiro ?? false, dadosRural.pocilga ?? false, dadosRural.silo ?? false, dadosRural.terraceamento ?? false, dadosRural.energia ?? false, dadosRural.agua ?? false, dadosRural.acessoAsfalto ?? false, dadosRural.casariao ?? false, dadosRural.areaAlqueires ?? null, dadosRural.tipoAlqueire ?? null, dadosRural.valorItr ?? null, tipologia.tipoVenda ?? 'Venda', tipologia.aceitaPermuta ?? false, tipologia.aceitaFinanciamento ?? false, fotosJson, proprietario.nome ?? null, proprietario.cpf ?? null, proprietario.telefone ?? null, proprietario.email ?? null);
+        const { endereco = {}, fichaTecnica = {}, dadosApartamento = {}, dadosLoteCondominio = {}, dadosCondominio = {}, dadosRural = {}, tipologia = {}, proprietario = {}, fotos = [], } = imovel;
+        const dataToCreate = {
+            id: novoId,
+            titulo: imovel.titulo,
+            descricao: imovel.descricao,
+            categoria: imovel.categoria,
+            tipo: imovel.tipo,
+            preco: imovel.preco,
+            ativo: imovel.ativo ?? true,
+            // Endereço
+            endereco_logradouro: endereco.logradouro,
+            endereco_numero: endereco.numero,
+            endereco_bairro: endereco.bairro,
+            endereco_cidade: endereco.cidade,
+            endereco_estado: endereco.estado,
+            endereco_cep: endereco.cep,
+            endereco_complemento: endereco.complemento,
+            // Ficha Técnica
+            quartos: fichaTecnica.quartos,
+            suites: fichaTecnica.suites,
+            banheiros: fichaTecnica.banheiros,
+            vagasGaragem: fichaTecnica.vagasGaragem,
+            areaTotal: fichaTecnica.areaTotal,
+            areaConstruida: fichaTecnica.areaConstruida,
+            anoConstructao: fichaTecnica.anoConstructao,
+            mobiliado: fichaTecnica.mobiliado,
+            valorIptu: fichaTecnica.valorIptu,
+            valorItu: fichaTecnica.valorItu,
+            escritorio: fichaTecnica.escritorio,
+            lavabo: fichaTecnica.lavabo,
+            despensa: fichaTecnica.despensa,
+            areaServico: fichaTecnica.areaServico,
+            jardim: fichaTecnica.jardim,
+            varandaGourmet: fichaTecnica.varandaGourmet,
+            piscinaPrivativa: fichaTecnica.piscinaPrivativa,
+            churrasqueiraPrivativa: fichaTecnica.churrasqueiraPrivativa,
+            // Dados Apartamento
+            numeroApartamento: dadosApartamento.numeroApartamento,
+            andar: dadosApartamento.andar,
+            blocoTorre: dadosApartamento.blocoTorre,
+            nomeEmpreendimento: dadosApartamento.nomeEmpreendimento,
+            elevador: dadosApartamento.elevador,
+            fachada: dadosApartamento.fachada,
+            // Dados Lote
+            nomeEmpreendimentoLote: dadosLoteCondominio.nomeEmpreendimento,
+            quadraLote: dadosLoteCondominio.quadra,
+            loteLote: dadosLoteCondominio.lote,
+            // Condominio
+            valorCondominio: dadosCondominio.valorCondominio,
+            seguranca24h: dadosCondominio.seguranca24h,
+            portaria: dadosCondominio.portaria,
+            elevadorCondominio: dadosCondominio.elevador,
+            quadraEsportiva: dadosCondominio.quadraEsportiva,
+            piscina: dadosCondominio.piscina,
+            salaoDeFestas: dadosCondominio.salaoDeFestas,
+            churrasqueira: dadosCondominio.churrasqueira,
+            playground: dadosCondominio.playground,
+            academia: dadosCondominio.academia,
+            vagasVisitante: dadosCondominio.vagasVisitante,
+            salaCinema: dadosCondominio.salaCinema,
+            hortaComunitaria: dadosCondominio.hortaComunitaria,
+            areaGourmetChurrasqueira: dadosCondominio.areaGourmetChurrasqueira,
+            miniMercado: dadosCondominio.miniMercado,
+            portariaRemota: dadosCondominio.portariaRemota,
+            coworking: dadosCondominio.coworking,
+            // Rural
+            rio: dadosRural.rio,
+            piscinaRural: dadosRural.piscina,
+            represa: dadosRural.represa,
+            lago: dadosRural.lago,
+            curral: dadosRural.curral,
+            estabulo: dadosRural.estabulo,
+            galinheiro: dadosRural.galinheiro,
+            pocilga: dadosRural.pocilga,
+            silo: dadosRural.silo,
+            terraceamento: dadosRural.terraceamento,
+            energia: dadosRural.energia,
+            agua: dadosRural.agua,
+            acessoAsfalto: dadosRural.acessoAsfalto,
+            casariao: dadosRural.casariao,
+            areaAlqueires: dadosRural.areaAlqueires,
+            tipoAlqueire: dadosRural.tipoAlqueire,
+            valorItr: dadosRural.valorItr,
+            // Tipologia
+            tipoVenda: tipologia.tipoVenda,
+            aceitaPermuta: tipologia.aceitaPermuta,
+            aceitaFinanciamento: tipologia.aceitaFinanciamento,
+            // Outros
+            fotos: JSON.stringify(fotos || []),
+            nomeDono: proprietario.nome,
+            cpfDono: proprietario.cpf,
+            telefoneDono: proprietario.telefone,
+            emailDono: proprietario.email,
+        };
+        // Remove chaves com valor `undefined` para não sobreescrever defaults no Prisma
+        Object.keys(dataToCreate).forEach(key => {
+            if (dataToCreate[key] === undefined) {
+                delete dataToCreate[key];
+            }
+        });
+        if (!db.prisma)
+            throw new Error('Prisma client não está disponível. Verifique a configuração do banco de dados.');
+        await db.prisma.imovel.create({ data: dataToCreate });
         console.log(`✅ Imóvel criado: ${novoId}`);
         res.json({ id: novoId });
     }
     catch (error) {
-        console.error('Erro ao criar imóvel:', error);
-        res.status(500).json({ error: 'Erro ao criar imóvel' });
+        console.error('Erro detalhado ao criar imóvel:', error);
+        let detail = '';
+        if (error instanceof Error) {
+            detail = error.message;
+        }
+        else if (typeof error === 'object' && error !== null && 'message' in error) {
+            detail = String(error.message);
+        }
+        else {
+            detail = String(error);
+        }
+        res.status(500).json({ error: 'Erro ao criar imóvel', detail });
     }
 });
 app.put('/api/imoveis/:id', async (req, res) => {
@@ -434,7 +540,8 @@ app.post('/api/leads', async (req, res) => {
             console.error('❌ Missing:', { id: !!id, imovelId: !!imovelId, titulo: !!titulo, nome: !!nome, telefone: !!telefone, email: !!email });
             return res.status(400).json({ error: 'Campos obrigatórios ausentes para lead' });
         }
-        const stmt = db.prepare('INSERT INTO leads (id, imovelId, imovelTitulo, clienteNome, clienteEmail, clienteTelefone) VALUES (?, ?, ?, ?, ?, ?)'); // Removido campo mensagem
+        const stmt = db.prepare('INSERT INTO leads (id, imovelId, imovelTitulo, clienteNome, clienteEmail, clienteTelefone) VALUES (?, ?, ?, ?, ?, ?)' // Removido campo mensagem
+        );
         await stmt.run(id, imovelId, titulo, nome, email, telefone);
         res.json({ ok: true });
     }

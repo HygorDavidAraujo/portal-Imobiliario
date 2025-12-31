@@ -593,31 +593,30 @@ app.post('/api/leads', async (req: Request, res: Response) => {
   try {
     const {
       id,
-      const {
-        id,
-        imovelId,
-        imovelTitulo,
-        nomeCliente,
-        telefoneCliente,
-        emailCliente,
-        cliente = {},
-      } = req.body || {};
-    const telefone = telefoneCliente || cliente.telefone;
-      const nome = nomeCliente || cliente.nome;
-      const telefone = telefoneCliente || cliente.telefone;
-      const email = emailCliente || cliente.email;
-      const titulo = imovelTitulo || req.body?.titulo;
+      imovelId,
+      imovelTitulo,
+      nomeCliente,
+      telefoneCliente,
+      emailCliente,
+      cliente = {},
+    } = req.body || {};
 
-      console.log('📝 Lead POST:', { id, imovelId, titulo, nome, email, telefone });
-      if (!id || !imovelId || !titulo || !nome || !telefone || !email) {
-        console.error('❌ Missing:', { id: !!id, imovelId: !!imovelId, titulo: !!titulo, nome: !!nome, telefone: !!telefone, email: !!email });
-        return res.status(400).json({ error: 'Campos obrigatórios ausentes para lead' });
-      }
-      const stmt = db.prepare(
-        'INSERT INTO leads (id, imovelId, imovelTitulo, clienteNome, clienteEmail, clienteTelefone) VALUES (?, ?, ?, ?, ?, ?)' // Removido campo mensagem
-      );
-      await stmt.run(id, imovelId, titulo, nome, email, telefone);
-      res.json({ ok: true });
+    const nome = nomeCliente || cliente.nome;
+    const telefone = telefoneCliente || cliente.telefone;
+    const email = emailCliente || cliente.email;
+    const titulo = imovelTitulo || req.body?.titulo;
+
+    console.log('📝 Lead POST:', { id, imovelId, titulo, nome, email, telefone });
+    if (!id || !imovelId || !titulo || !nome || !telefone || !email) {
+      console.error('❌ Missing:', { id: !!id, imovelId: !!imovelId, titulo: !!titulo, nome: !!nome, telefone: !!telefone, email: !!email });
+      return res.status(400).json({ error: 'Campos obrigatórios ausentes para lead' });
+    }
+    const stmt = db.prepare(
+      'INSERT INTO leads (id, imovelId, imovelTitulo, clienteNome, clienteEmail, clienteTelefone) VALUES (?, ?, ?, ?, ?, ?)' // Removido campo mensagem
+    );
+    await stmt.run(id, imovelId, titulo, nome, email, telefone);
+    res.json({ ok: true });
+  } catch (error) {
     console.error('Erro ao criar lead:', error);
     res.status(500).json({ error: 'Erro ao criar lead' });
   }

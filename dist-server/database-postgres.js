@@ -123,7 +123,7 @@ const prepare = (sql) => {
         if (upperSql.startsWith('SELECT * FROM IMOVEIS WHERE ID = ?')) {
             return prisma.imovel.findUnique({ where: { id: params[0] } });
         }
-        if (upperSql.startsWith("SELECT ID FROM IMOVEIS WHERE ID LIKE '")) {
+        if (upperSql.includes("SELECT ID FROM IMOVEIS WHERE ID LIKE '")) {
             const match = sql.match(/'([^']*)%'/);
             const prefix = match ? match[1] : null;
             if (!prefix) {
@@ -201,7 +201,6 @@ const prepare = (sql) => {
                 nomeCliente: params[3],
                 emailCliente: params[4],
                 telefoneCliente: params[5],
-                mensagem: params[6],
             };
             return prisma.lead.create({ data });
         }
@@ -219,6 +218,7 @@ const prepare = (sql) => {
 };
 const db = {
     prepare,
+    prisma,
 };
 // Exporta o objeto 'db' compatível para ser usado no index.js
 export default db;
