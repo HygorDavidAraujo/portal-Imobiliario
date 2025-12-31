@@ -50,13 +50,16 @@ async function sendOtpViaEmail(otp: string, email: string) {
   const text = `Seu código de acesso ao Portal Imobiliário: ${otp}`;
   const html = `<p>Seu código de acesso ao <b>Portal Imobiliário</b>:</p><h2>${otp}</h2>`;
 
-  // Prefer Resend API for cloud reliability
-  if (process.env.RESEND_API_KEY) {
+  // Log para depuração: mostrar se RESEND_API_KEY está presente
+  const resendKey = process.env.RESEND_API_KEY;
+  console.log('[OTP] RESEND_API_KEY:', resendKey ? resendKey.slice(0, 8) + '...' : 'NÃO DEFINIDO');
+  if (resendKey) {
+    console.log('[OTP] Tentando envio via Resend API...');
     const mailFrom = process.env.MAIL_FROM || process.env.MAIL_USER || 'onboarding@resend.dev';
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        Authorization: `Bearer ${resendKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -67,14 +70,18 @@ async function sendOtpViaEmail(otp: string, email: string) {
       }),
     });
     if (response.ok) {
-      console.log('OTP enviado por Resend API');
+      console.log('[OTP] Enviado por Resend API');
       return;
     } else {
       const detail = await response.text();
-      console.error('Resend falhou:', detail);
+      console.error('[OTP] Resend falhou:', detail);
       // Continua para tentar SMTP abaixo
     }
+  } else {
+    console.log('[OTP] RESEND_API_KEY não definido, pulando envio via Resend.');
   }
+
+  console.log('[OTP] Tentando envio via SMTP (nodemailer)...');
 
   // Fallback para SMTP local
   const transporter = nodemailer.createTransport({
