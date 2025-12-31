@@ -30,7 +30,43 @@ function hashOtp(otp) {
 }
 // Envio real: agora por e-mail
 async function sendOtpViaEmail(otp, email) {
-    // Usa variáveis de ambiente já existentes
+    const subject = 'Seu código de acesso administrativo';
+    const text = `Seu código de acesso ao Portal Imobiliário: ${otp}`;
+    const html = `<p>Seu código de acesso ao <b>Portal Imobiliário</b>:</p><h2>${otp}</h2>`;
+    // Log para depuração: mostrar se RESEND_API_KEY está presente
+    const resendKey = process.env.RESEND_API_KEY;
+    console.log('[OTP] RESEND_API_KEY:', resendKey ? resendKey.slice(0, 8) + '...' : 'NÃO DEFINIDO');
+    if (resendKey) {
+        console.log('[OTP] Tentando envio via Resend API...');
+        const mailFrom = process.env.MAIL_FROM || process.env.MAIL_USER || 'onboarding@resend.dev';
+        const response = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${resendKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                from: mailFrom,
+                to: email,
+                subject,
+                html,
+            }),
+        });
+        if (response.ok) {
+            console.log('[OTP] Enviado por Resend API');
+            return;
+        }
+        else {
+            const detail = await response.text();
+            console.error('[OTP] Resend falhou:', detail);
+            // Continua para tentar SMTP abaixo
+        }
+    }
+    else {
+        console.log('[OTP] RESEND_API_KEY não definido, pulando envio via Resend.');
+    }
+    console.log('[OTP] Tentando envio via SMTP (nodemailer)...');
+    // Fallback para SMTP local
     const transporter = nodemailer.createTransport({
         host: process.env.MAIL_HOST,
         port: Number(process.env.MAIL_PORT),
@@ -43,11 +79,11 @@ async function sendOtpViaEmail(otp, email) {
     const info = await transporter.sendMail({
         from: `Portal Imobiliário <${process.env.MAIL_USER}>`,
         to: email,
-        subject: 'Seu código de acesso administrativo',
-        text: `Seu código de acesso ao Portal Imobiliário: ${otp}`,
-        html: `<p>Seu código de acesso ao <b>Portal Imobiliário</b>:</p><h2>${otp}</h2>`,
+        subject,
+        text,
+        html,
     });
-    console.log('OTP enviado por e-mail:', info.messageId);
+    console.log('OTP enviado por SMTP:', info.messageId);
 }
 // Rate limit básico: impede spam de envio
 app.post('/api/admin/send-otp', async (req, res) => {
