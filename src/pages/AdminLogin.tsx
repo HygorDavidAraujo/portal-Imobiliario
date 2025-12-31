@@ -1,3 +1,5 @@
+// Utiliza a URL da API do backend definida em variável de ambiente
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 import React, { useState, useRef, useEffect } from 'react';
 import logo from '../img/logo.png'; // Ajuste o caminho se necessário
@@ -34,7 +36,7 @@ export const AdminLogin: React.FC = () => {
     // Removido: setWaMessage('');
     try {
       // Chamada para backend gerar e enviar OTP
-      const res = await fetch('/api/admin/send-otp', { method: 'POST' });
+      const res = await fetch(`${API_BASE_URL}/api/admin/send-otp`, { method: 'POST' });
       await res.json();
       if (!res.ok) throw new Error('Erro ao enviar código.');
       setStep('sent');
@@ -53,7 +55,7 @@ export const AdminLogin: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/admin/validate-otp', {
+      const res = await fetch(`${API_BASE_URL}/api/admin/validate-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ otp }),
