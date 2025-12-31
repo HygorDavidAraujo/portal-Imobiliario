@@ -95,6 +95,8 @@ export const Leads: React.FC = () => {
         ) : (
           <div className="space-y-4">
             {leads.map((lead) => {
+                            // Debug: mostrar o objeto lead completo no console
+                            console.log('LEAD OBJETO:', lead);
               const imovel = obterImovel(lead.imovelId);
               // Busca direto dos campos do banco, sem depender do objeto cliente
               const nome = (lead as any).nomeCliente || (lead as any).clienteNome || (lead.cliente && lead.cliente.nome) || '(sem nome)';
