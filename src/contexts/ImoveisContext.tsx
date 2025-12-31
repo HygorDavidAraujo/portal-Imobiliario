@@ -233,7 +233,14 @@ export const ImoveisProvider: React.FC<ImoveisProviderProps> = ({ children }) =>
         throw await handleApiResponseError(response, 'Erro ao salvar lead.');
       }
 
-      setLeads((prev) => [lead, ...prev]);
+      // Garante que cada lead adicionado tenha um objeto cliente independente
+      setLeads((prev) => [
+        {
+          ...lead,
+          cliente: { ...lead.cliente },
+        },
+        ...prev,
+      ]);
     } catch (error) {
       console.error('Erro ao adicionar lead:', error);
       if (!apiError) {
