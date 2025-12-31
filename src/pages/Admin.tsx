@@ -1,11 +1,17 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+
 import { useImoveis } from '../contexts/ImoveisContext';
-import { formatarMoeda, obterFotoDestaque } from '../utils/helpers';
-import { Plus, Edit, Trash2, Home, Building2, Users, Eye, EyeOff } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Building2, Users, Home, Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
+import { obterFotoDestaque, formatarMoeda } from '../utils/helpers';
 
 export const Admin: React.FC = () => {
   const { imoveis, removerImovel, atualizarImovel, leads } = useImoveis();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem('adminSession');
+    navigate('/admin/login', { replace: true });
+  };
 
   const leadsNaoVisualizados = leads.filter(l => !l.visualizado).length;
 
@@ -38,7 +44,7 @@ export const Admin: React.FC = () => {
               <Building2 size={32} className="text-gold-400" />
               <h1 className="text-3xl font-bold">Gerenciamento de Imóveis</h1>
             </div>
-            <div className="flex gap-4">
+            <div className="flex gap-4 items-center">
               <Link
                 to="/admin/leads"
                 className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors flex items-center gap-2 relative"
@@ -58,6 +64,13 @@ export const Admin: React.FC = () => {
                 <Home size={20} />
                 Ver Catálogo
               </Link>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors text-white font-semibold ml-2"
+                title="Encerrar sessão"
+              >
+                Encerrar Sessão
+              </button>
             </div>
           </div>
         </div>

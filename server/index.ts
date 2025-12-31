@@ -1,9 +1,104 @@
+
+
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 
 dotenv.config();
+
+
+
+const app = express();
+
+// ==================== LOGIN ADMIN OTP ====================
+const ADMIN_PHONE = '+5562981831483';
+const OTP_EXPIRATION = 60 * 1000; // 60 segundos
+const OTP_ATTEMPT_LIMIT = 5;
+let adminOtp: {
+  hash: string;
+  expires: number;
+  attempts: number;
+} | null = null;
+let lastOtpSentAt = 0;
+
+function generateOtp() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function hashOtp(otp: string) {
+  return crypto.createHash('sha256').update(otp + process.env.OTP_SECRET).digest('hex');
+}
+
+
+// Envio real: agora por e-mail
+async function sendOtpViaEmail(otp: string, email: string) {
+  // Usa variáveis de ambiente já existentes
+  const transporter = nodemailer.createTransport({
+    host: process.env.MAIL_HOST,
+    port: Number(process.env.MAIL_PORT),
+    secure: true,
+    auth: {
+      user: process.env.MAIL_USER,
+      pass: process.env.MAIL_PASS,
+    },
+  });
+  const info = await transporter.sendMail({
+    from: `Portal Imobiliário <${process.env.MAIL_USER}>`,
+    to: email,
+    subject: 'Seu código de acesso administrativo',
+    text: `Seu código de acesso ao Portal Imobiliário: ${otp}`,
+    html: `<p>Seu código de acesso ao <b>Portal Imobiliário</b>:</p><h2>${otp}</h2>`,
+  });
+  console.log('OTP enviado por e-mail:', info.messageId);
+}
+
+// Rate limit básico: impede spam de envio
+app.post('/api/admin/send-otp', async (req: Request, res: Response) => {
+  const now = Date.now();
+  if (now - lastOtpSentAt < 5000) {
+    return res.status(429).json({ error: 'Aguarde alguns segundos para reenviar.' });
+  }
+  const otp = generateOtp();
+  const hash = hashOtp(otp);
+  adminOtp = {
+    hash,
+    expires: now + OTP_EXPIRATION,
+    attempts: 0,
+  };
+  lastOtpSentAt = now;
+  try {
+    await sendOtpViaEmail(otp, process.env.MAIL_TO || 'hygordavidaraujo@gmail.com');
+  } catch (e) {
+    console.error('Erro ao enviar e-mail:', e);
+    return res.status(500).json({ error: 'Erro ao enviar e-mail.' });
+  }
+  res.json({ ok: true });
+});
+
+// Validação do OTP
+app.post('/api/admin/validate-otp', express.json(), (req: Request, res: Response) => {
+  const { otp } = req.body || {};
+  if (!otp || typeof otp !== 'string' || otp.length !== 6) {
+    return res.status(400).json({ error: 'Código inválido.' });
+  }
+  if (!adminOtp || Date.now() > adminOtp.expires) {
+    adminOtp = null;
+    return res.status(400).json({ error: 'Código expirado. Solicite um novo.' });
+  }
+  if (adminOtp.attempts >= OTP_ATTEMPT_LIMIT) {
+    adminOtp = null;
+    return res.status(429).json({ error: 'Muitas tentativas. Solicite um novo código.' });
+  }
+  adminOtp.attempts++;
+  if (hashOtp(otp) !== adminOtp.hash) {
+    return res.status(400).json({ error: 'Código incorreto.' });
+  }
+  // Sucesso: invalida o código
+  adminOtp = null;
+  res.json({ ok: true });
+});
 
 // Escolhe o banco baseado na variável de ambiente
 let db, initializeDatabase;
@@ -28,7 +123,7 @@ if (process.env.DATABASE_URL) {
   }
 }
 
-const app = express();
+// const app = express(); // Removido duplicidade
 const PORT = Number(process.env.PORT) || 4000;
 
 // CORS configurado para produção
