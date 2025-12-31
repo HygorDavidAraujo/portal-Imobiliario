@@ -202,9 +202,10 @@ const mapRowToLead = (row) => {
     const id = String(row.id || '');
     const imovelId = String(row.imovelId || row.imovelid || '');
     const imovelTitulo = String(row.imovelTitulo || row.imoveltitulo || row.titulo || '');
-    const clienteNome = String(row.clienteNome || row.nomeCliente || row.clientenome || '');
-    const clienteEmail = String(row.clienteEmail || row.clienteemail || '');
-    const clienteTelefone = String(row.clienteTelefone || row.clientetelefone || '');
+    // Busca também as versões minúsculas dos campos (compatível com PostgreSQL)
+    const clienteNome = String(row.clienteNome || row.nomeCliente || row.clientenome || row.nomecliente || row.nome || '');
+    const clienteEmail = String(row.clienteEmail || row.emailCliente || row.clienteemail || row.emailcliente || row.email || '');
+    const clienteTelefone = String(row.clienteTelefone || row.telefoneCliente || row.clientetelefone || row.telefonecliente || row.telefone || '');
     const mensagem = String((row.mensagem ?? '') || '');
     const created = row.data || row.criadoEm || row.criadoem;
     const data = created ? new Date(created) : new Date();
