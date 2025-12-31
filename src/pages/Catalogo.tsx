@@ -48,7 +48,7 @@ export const Catalogo: React.FC = () => {
               />
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-gold-300 to-gold-500 bg-clip-text text-transparent">
-                  Hygor David Araújo
+                  Hygor Araújo
                 </h1>
                 <p className="text-sm text-slate-300">Corretor de Imóveis</p>
                 <p className="text-xs text-gold-400 font-semibold">CRECI: 42.860</p>

@@ -206,13 +206,12 @@ const prepare = (sql: string) => {
     }
     if (upperSql.startsWith('INSERT INTO LEADS')) {
         const data = {
-            id: params[0],
-            imovelId: params[1],
-            imovelTitulo: params[2],
-            nomeCliente: params[3],
-            emailCliente: params[4],
-            telefoneCliente: params[5],
-            mensagem: params[6],
+          id: params[0],
+          imovelId: params[1],
+          imovelTitulo: params[2],
+          nomeCliente: params[3],
+          emailCliente: params[4],
+          telefoneCliente: params[5],
         };
         return prisma.lead.create({ data });
     }

@@ -424,7 +424,7 @@ app.get('/api/leads', async (_req, res) => {
 });
 app.post('/api/leads', async (req, res) => {
     try {
-        const { id, imovelId, imovelTitulo, nomeCliente, telefoneCliente, emailCliente, mensagem, cliente = {}, } = req.body || {};
+        const { id, imovelId, imovelTitulo, nomeCliente, telefoneCliente, emailCliente, cliente = {}, } = req.body || {};
         const nome = nomeCliente || cliente.nome;
         const telefone = telefoneCliente || cliente.telefone;
         const email = emailCliente || cliente.email;
@@ -434,8 +434,8 @@ app.post('/api/leads', async (req, res) => {
             console.error('❌ Missing:', { id: !!id, imovelId: !!imovelId, titulo: !!titulo, nome: !!nome, telefone: !!telefone, email: !!email });
             return res.status(400).json({ error: 'Campos obrigatórios ausentes para lead' });
         }
-        const stmt = db.prepare('INSERT INTO leads (id, imovelId, imovelTitulo, clienteNome, clienteEmail, clienteTelefone, mensagem) VALUES (?, ?, ?, ?, ?, ?, ?)');
-        await stmt.run(id, imovelId, titulo, nome, email, telefone, mensagem || null);
+        const stmt = db.prepare('INSERT INTO leads (id, imovelId, imovelTitulo, clienteNome, clienteEmail, clienteTelefone) VALUES (?, ?, ?, ?, ?, ?)'); // Removido campo mensagem
+        await stmt.run(id, imovelId, titulo, nome, email, telefone);
         res.json({ ok: true });
     }
     catch (error) {
