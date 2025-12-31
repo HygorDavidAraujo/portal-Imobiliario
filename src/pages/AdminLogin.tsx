@@ -2,8 +2,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import logo from '../img/logo.png'; // Ajuste o caminho se necessário
 
-const ADMIN_PHONE = '+55 62 98183-1483';
-const ADMIN_PHONE_WA = '5562981831483';
 const SESSION_DURATION = 60 * 60 * 1000; // 1 hora em ms
 
 export const AdminLogin: React.FC = () => {
@@ -37,7 +35,7 @@ export const AdminLogin: React.FC = () => {
     try {
       // Chamada para backend gerar e enviar OTP
       const res = await fetch('/api/admin/send-otp', { method: 'POST' });
-      const data = await res.json();
+      await res.json();
       if (!res.ok) throw new Error('Erro ao enviar código.');
       setStep('sent');
       setTimer(60);
