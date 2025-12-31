@@ -209,8 +209,8 @@ const mapRowToLead = (row: any) => {
   const imovelTitulo = String(row.imovelTitulo || row.imoveltitulo || row.titulo || '');
   // Corrigir para pegar nome, email e telefone do lead, independente do nome do campo
   const clienteNome = String(row.clienteNome || row.nomeCliente || row.clientenome || row.nome || '');
-  const clienteEmail = String(row.clienteEmail || row.emailCliente || row.clienteemail || row.email || '');
-  const clienteTelefone = String(row.clienteTelefone || row.telefoneCliente || row.clientetelefone || row.telefone || '');
+  const clienteEmail = String(row.clienteEmail || row.emailCliente || row.clienteemail || row.emailCliente || row.email || '');
+  const clienteTelefone = String(row.clienteTelefone || row.telefoneCliente || row.clientetelefone || row.telefoneCliente || row.telefone || '');
   const mensagem = String((row.mensagem ?? '') || '');
   const created = row.data || row.criadoEm || row.criadoem;
   const data = created ? new Date(created) : new Date();
