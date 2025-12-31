@@ -5,7 +5,7 @@ import { formatarMoeda, obterFotoDestaque, formatarTelefone } from '../utils/hel
 import { Users, Eye, Home, Building2, Mail, Phone, Calendar } from 'lucide-react';
 
 export const Leads: React.FC = () => {
-  const { leads, marcarLeadComoVisualizado, imoveis, contatoCliente } = useImoveis();
+  const { leads, marcarLeadComoVisualizado, imoveis } = useImoveis();
 
   const leadsNaoVisualizados = leads.filter(l => !l.visualizado).length;
 
