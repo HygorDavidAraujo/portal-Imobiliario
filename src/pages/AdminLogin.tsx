@@ -64,8 +64,10 @@ export const AdminLogin: React.FC = () => {
         const data = await res.json();
         throw new Error(data.error || 'Código incorreto ou expirado.');
       }
+      const data = await res.json();
       setStep('success');
-      // Salva sessão de 1 hora
+      // Salva token JWT e sessão
+      localStorage.setItem('adminToken', data.token);
       localStorage.setItem('adminSession', JSON.stringify({ expires: Date.now() + SESSION_DURATION }));
       setTimeout(() => window.location.href = '/admin', 1000);
     } catch (e: any) {

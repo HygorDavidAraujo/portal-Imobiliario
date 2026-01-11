@@ -1,37 +1,83 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useImoveis } from '../contexts/ImoveisContext';
 import { FiltrosCatalogo, Imovel } from '../types';
-import { formatarMoeda, obterFotoDestaque } from '../utils/helpers';
+import { formatarMoeda, obterFotoDestaque, otimizarUrlCloudinary } from '../utils/helpers';
 import { Phone, Mail, Facebook, Instagram, MapPin, Bed, Bath, Car, Maximize, Search, Filter, Heart } from 'lucide-react';
 import logo from '../img/logo.png';
 
 export const Catalogo: React.FC = () => {
-  const { imoveis, favoritos } = useImoveis();
+  const {
+    imoveis,
+    favoritos,
+    paginacaoImoveis,
+    carregandoImoveis,
+    carregarProximaPaginaImoveis,
+    aplicarFiltrosCatalogo,
+    sortImoveisAtual,
+    definirOrdenacaoImoveis,
+  } = useImoveis();
   const [filtros, setFiltros] = useState<FiltrosCatalogo>({});
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [mostrarApensFavoritos, setMostrarApenasFavoritos] = useState(false);
 
-  const imoveisFiltrados = useMemo(() => {
-    return imoveis.filter((imovel) => {
-      if (!imovel.ativo) return false;
-      if (mostrarApensFavoritos && !favoritos.includes(imovel.id)) return false;
-      if (filtros.id && !imovel.id.toLowerCase().includes(filtros.id.toLowerCase())) return false;
-      if (filtros.categoria && imovel.categoria !== filtros.categoria) return false;
-      if (filtros.tipo && imovel.tipo !== filtros.tipo) return false;
-      if (filtros.bairro && imovel.endereco.bairro && !imovel.endereco.bairro.toLowerCase().includes(filtros.bairro.toLowerCase())) return false;
-      if (filtros.cidade && imovel.endereco.cidade && !imovel.endereco.cidade.toLowerCase().includes(filtros.cidade.toLowerCase())) return false;
-      if (filtros.estado && imovel.endereco.estado && !imovel.endereco.estado.toLowerCase().includes(filtros.estado.toLowerCase())) return false;
-      if (filtros.precoMin && imovel.preco < filtros.precoMin) return false;
-      if (filtros.precoMax && imovel.preco > filtros.precoMax) return false;
-      if (filtros.quartos && (!imovel.fichaTecnica.quartos || imovel.fichaTecnica.quartos < filtros.quartos)) return false;
-      return true;
-    });
-  }, [imoveis, filtros, mostrarApensFavoritos, favoritos]);
+  const [bairrosUnicos, setBairrosUnicos] = useState<string[]>([]);
+  const [cidadesUnicas, setCidadesUnicas] = useState<string[]>([]);
+  const [tiposUnicos, setTiposUnicos] = useState<string[]>([]);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 
-  const bairrosUnicos = Array.from(new Set(imoveis.map(i => i.endereco.bairro).filter(Boolean))).sort();
-  const cidadesUnicas = Array.from(new Set(imoveis.map(i => i.endereco.cidade))).sort();
-  const tiposUnicos = Array.from(new Set(imoveis.map(i => i.tipo))).sort();
+  // Filtros agora são aplicados no backend; no front filtramos apenas por favoritos.
+  const imoveisFiltrados = useMemo(() => {
+    if (!mostrarApensFavoritos) return imoveis;
+    return imoveis.filter((imovel) => favoritos.includes(imovel.id));
+  }, [imoveis, mostrarApensFavoritos, favoritos]);
+
+  // Carrega valores para selects (facets) uma única vez.
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const res = await fetch(`${apiBaseUrl}/api/imoveis/facets`);
+        if (!res.ok) return;
+        const json = await res.json();
+        setBairrosUnicos(Array.isArray(json?.bairros) ? json.bairros : []);
+        setCidadesUnicas(Array.isArray(json?.cidades) ? json.cidades : []);
+        setTiposUnicos(Array.isArray(json?.tipos) ? json.tipos : []);
+      } catch {
+        // silencioso
+      }
+    };
+    void run();
+  }, [apiBaseUrl]);
+
+  // Debounce: aplica filtros no backend.
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      if (mostrarApensFavoritos) return;
+      void aplicarFiltrosCatalogo(filtros);
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [filtros, mostrarApensFavoritos, aplicarFiltrosCatalogo]);
+
+  // Scroll infinito: quando sentinel aparece, carrega próxima página.
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    if (mostrarApensFavoritos) return;
+    if (!paginacaoImoveis?.hasNextPage) return;
+
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const first = entries[0];
+        if (!first?.isIntersecting) return;
+        if (carregandoImoveis) return;
+        void carregarProximaPaginaImoveis();
+      },
+      { rootMargin: '600px' }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [paginacaoImoveis?.hasNextPage, carregandoImoveis, carregarProximaPaginaImoveis, mostrarApensFavoritos]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -108,7 +154,7 @@ export const Catalogo: React.FC = () => {
           </button>
 
           <div className={`${mostrarFiltros ? 'block' : 'hidden'} md:block`}>
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
               <input
                 type="text"
                 placeholder="Buscar por ID..."
@@ -161,6 +207,18 @@ export const Catalogo: React.FC = () => {
                 ))}
               </select>
 
+              <select
+                value={sortImoveisAtual}
+                onChange={(e) => void definirOrdenacaoImoveis(e.target.value as any)}
+                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                title="Ordenar resultados"
+              >
+                <option value="data-desc">Mais recentes</option>
+                <option value="data-asc">Mais antigos</option>
+                <option value="preco-asc">Menor preço</option>
+                <option value="preco-desc">Maior preço</option>
+              </select>
+
               <button
                 onClick={() => setFiltros({})}
                 className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium"
@@ -176,8 +234,16 @@ export const Catalogo: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="mb-6 flex justify-between items-center flex-wrap gap-4">
           <h2 className="text-2xl font-bold text-slate-800">
-            {imoveisFiltrados.length} {imoveisFiltrados.length === 1 ? 'imóvel encontrado' : 'imóveis encontrados'}
+            {paginacaoImoveis?.total != null && !mostrarApensFavoritos
+              ? `${paginacaoImoveis.total} ${paginacaoImoveis.total === 1 ? 'imóvel encontrado' : 'imóveis encontrados'}`
+              : `${imoveisFiltrados.length} ${imoveisFiltrados.length === 1 ? 'imóvel encontrado' : 'imóveis encontrados'}`}
           </h2>
+          {!mostrarApensFavoritos && paginacaoImoveis?.total != null && (
+            <div className="text-sm text-slate-600">
+              Mostrando <span className="font-semibold">{imoveis.length}</span> de{' '}
+              <span className="font-semibold">{paginacaoImoveis.total}</span>
+            </div>
+          )}
           <button
             onClick={() => setMostrarApenasFavoritos(!mostrarApensFavoritos)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
@@ -202,11 +268,28 @@ export const Catalogo: React.FC = () => {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {imoveisFiltrados.map((imovel) => (
-              <ImovelCard key={imovel.id} imovel={imovel} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {imoveisFiltrados.map((imovel) => (
+                <ImovelCard key={imovel.id} imovel={imovel} />
+              ))}
+            </div>
+
+            {paginacaoImoveis?.hasNextPage && !mostrarApensFavoritos && (
+              <div className="flex justify-center mt-10">
+                <button
+                  onClick={() => void carregarProximaPaginaImoveis()}
+                  disabled={carregandoImoveis}
+                  className="px-6 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors font-semibold"
+                >
+                  {carregandoImoveis ? 'Carregando...' : 'Carregar mais imóveis'}
+                </button>
+              </div>
+            )}
+
+            {/* Sentinel do scroll infinito */}
+            <div ref={sentinelRef} className="h-1" />
+          </>
         )}
       </div>
 
@@ -228,7 +311,7 @@ interface ImovelCardProps {
 
 const ImovelCard: React.FC<ImovelCardProps> = ({ imovel }) => {
   const { toggleFavorito, isFavorito } = useImoveis();
-  const fotoDestaque = obterFotoDestaque(imovel.fotos);
+  const fotoDestaque = otimizarUrlCloudinary(obterFotoDestaque(imovel.fotos), { width: 700 });
   const favorito = isFavorito(imovel.id);
 
   const handleFavoritar = (e: React.MouseEvent) => {
@@ -247,6 +330,8 @@ const ImovelCard: React.FC<ImovelCardProps> = ({ imovel }) => {
         <img
           src={fotoDestaque}
           alt={imovel.titulo}
+          loading="lazy"
+          decoding="async"
           className="w-full h-full object-cover"
           onError={(e) => {
             const target = e.target as HTMLImageElement;

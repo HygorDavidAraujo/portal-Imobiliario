@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useImoveis } from '../contexts/ImoveisContext';
 import { ContatoCliente, Lead } from '../types';
-import { formatarMoeda, validarEmail, validarTelefone, enviarWhatsApp, categorizarAndar, obterDescricaoFachada, gerarId } from '../utils/helpers';
+import { formatarMoeda, validarEmail, validarTelefone, enviarWhatsApp, categorizarAndar, obterDescricaoFachada, gerarId, otimizarUrlCloudinary } from '../utils/helpers';
 import {
   ArrowLeft,
   MapPin,
@@ -169,8 +169,10 @@ export const DetalhesImovel: React.FC = () => {
             <div className="bg-white rounded-lg shadow-lg overflow-hidden">
               <div className="relative h-96 bg-slate-200">
                 <img
-                  src={imovel.fotos[fotoAtual]?.url}
+                  src={otimizarUrlCloudinary(imovel.fotos[fotoAtual]?.url, { width: 1400 })}
                   alt={`Foto ${fotoAtual + 1}`}
+                  loading="eager"
+                  decoding="async"
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
@@ -208,8 +210,10 @@ export const DetalhesImovel: React.FC = () => {
                       }`}
                     >
                       <img
-                        src={foto.url}
+                        src={otimizarUrlCloudinary(foto.url, { width: 220 })}
                         alt={`Miniatura ${index + 1}`}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover"
                       />
                     </button>

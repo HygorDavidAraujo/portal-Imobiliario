@@ -11,8 +11,9 @@ import { AdminLogin } from './pages/AdminLogin';
 // Rota protegida para admin
 function PrivateRoute({ children }: { children: JSX.Element }) {
   const session = localStorage.getItem('adminSession');
+  const token = localStorage.getItem('adminToken');
   let valid = false;
-  if (session) {
+  if (session && token) {
     try {
       const { expires } = JSON.parse(session);
       valid = Date.now() < expires;

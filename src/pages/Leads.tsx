@@ -1,24 +1,26 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useImoveis } from '../contexts/ImoveisContext';
-import { formatarMoeda, obterFotoDestaque, formatarTelefone } from '../utils/helpers';
+import { formatarMoeda, obterFotoDestaque, formatarTelefone, otimizarUrlCloudinary } from '../utils/helpers';
 import { Users, Eye, Home, Building2, Mail, Phone, Calendar } from 'lucide-react';
 
 export const Leads: React.FC = () => {
-  const { leads, marcarLeadComoVisualizado, imoveis } = useImoveis();
+  const {
+    leads,
+    marcarLeadComoVisualizado,
+    imoveis,
+    paginacaoLeads,
+    carregandoLeads,
+    totalLeads,
+    leadsNaoVisualizados,
+    filtroLeadsVisualizado,
+    sortLeadsAtual,
+    carregarProximaPaginaLeads,
+    aplicarFiltroLeadsVisualizado,
+    definirOrdenacaoLeads,
+  } = useImoveis();
 
-  const leadsNaoVisualizados = leads.filter(l => !l.visualizado).length;
-
-  // Debug: log leads quando carregam
-  React.useEffect(() => {
-    console.log('📊 Leads carregados:', leads);
-    if (leads.length > 0) {
-      console.log('  Primeiro lead:', leads[0]);
-      console.log('  Cliente:', leads[0].cliente);
-      console.log('  Imóvel ID:', leads[0].imovelId);
-      console.log('  Imóvel Título:', leads[0].imovelTitulo);
-    }
-  }, [leads]);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const obterImovel = (imovelId: string) => {
     return imoveis.find(i => i.id === imovelId);
@@ -35,6 +37,25 @@ export const Leads: React.FC = () => {
     });
   };
 
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    if (!paginacaoLeads?.hasNextPage) return;
+
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const first = entries[0];
+        if (!first?.isIntersecting) return;
+        if (carregandoLeads) return;
+        void carregarProximaPaginaLeads();
+      },
+      { rootMargin: '600px' }
+    );
+
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [paginacaoLeads?.hasNextPage, carregandoLeads, carregarProximaPaginaLeads]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       <header className="bg-gradient-to-r from-slate-900 via-slate-800 to-blue-900 text-white shadow-2xl">
@@ -50,7 +71,7 @@ export const Leads: React.FC = () => {
                       {leadsNaoVisualizados} novo{leadsNaoVisualizados > 1 ? 's' : ''}
                     </span>
                   )}
-                  Total de {leads.length} contato{leads.length !== 1 ? 's' : ''}
+                  Total de {totalLeads} contato{totalLeads !== 1 ? 's' : ''}
                 </p>
               </div>
             </div>
@@ -75,6 +96,38 @@ export const Leads: React.FC = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="bg-white rounded-lg shadow-lg p-4 mb-6 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-semibold text-slate-700">Filtro:</span>
+            <select
+              value={filtroLeadsVisualizado}
+              onChange={(e) => void aplicarFiltroLeadsVisualizado(e.target.value as any)}
+              className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
+            >
+              <option value="all">Todos</option>
+              <option value="nao-visualizados">Não visualizados</option>
+              <option value="visualizados">Visualizados</option>
+            </select>
+
+            <span className="text-sm font-semibold text-slate-700">Ordenar:</span>
+            <select
+              value={sortLeadsAtual}
+              onChange={(e) => void definirOrdenacaoLeads(e.target.value as any)}
+              className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
+            >
+              <option value="data-desc">Mais recentes</option>
+              <option value="data-asc">Mais antigos</option>
+            </select>
+          </div>
+
+          {paginacaoLeads?.total != null && (
+            <div className="text-sm text-slate-600">
+              Mostrando <span className="font-semibold">{leads.length}</span> de{' '}
+              <span className="font-semibold">{paginacaoLeads.total}</span>
+            </div>
+          )}
+        </div>
+
         {leads.length === 0 ? (
           <div className="bg-white rounded-lg shadow-lg p-12 text-center">
             <Users size={64} className="mx-auto text-slate-300 mb-4" />
@@ -95,8 +148,6 @@ export const Leads: React.FC = () => {
         ) : (
           <div className="space-y-4">
             {leads.map((lead) => {
-                            // Debug: mostrar o objeto lead completo no console
-                            console.log('LEAD OBJETO:', lead);
               const imovel = obterImovel(lead.imovelId);
               // Busca direto dos campos do banco, sem depender do objeto cliente
               const nome = (lead as any).nomeCliente || (lead as any).clienteNome || (lead.cliente && lead.cliente.nome) || '(sem nome)';
@@ -114,8 +165,10 @@ export const Leads: React.FC = () => {
                     {imovel && (
                       <div className="md:w-48 h-32 md:h-auto bg-slate-200 flex-shrink-0">
                         <img
-                          src={obterFotoDestaque(imovel.fotos)}
+                          src={otimizarUrlCloudinary(obterFotoDestaque(imovel.fotos), { width: 500 })}
                           alt={imovel.titulo}
+                          loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
@@ -221,6 +274,20 @@ export const Leads: React.FC = () => {
                 </div>
               );
             })}
+
+            {paginacaoLeads?.hasNextPage && (
+              <div className="flex justify-center pt-4">
+                <button
+                  onClick={() => void carregarProximaPaginaLeads()}
+                  disabled={carregandoLeads}
+                  className="px-6 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors font-semibold"
+                >
+                  {carregandoLeads ? 'Carregando...' : 'Carregar mais'}
+                </button>
+              </div>
+            )}
+
+            <div ref={sentinelRef} className="h-1" />
           </div>
         )}
       </div>

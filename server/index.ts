@@ -5,24 +5,71 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
+import multer from 'multer';
+import { v2 as cloudinary } from 'cloudinary';
+import { imovelSchema, leadSchema, sendLeadEmailSchema, validateAndFormat } from './schemas.js';
 
 dotenv.config();
 
+const gerarId = (): string => {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+};
 
+const JWT_SECRET = process.env.JWT_SECRET || 'portal-imobiliario-secret-key-change-in-production';
+const JWT_EXPIRATION = '24h';
+
+// ==================== CONFIGURAÇÃO CLOUDINARY ====================
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Configuração do Multer para upload em memória
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB máximo por arquivo
+  },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Apenas imagens são permitidas'));
+    }
+  },
+});
 
 const app = express();
 
-// ==================== CORS PRIMEIRO ====================
-// (Removido: duplicidade de allowedOrigins)
-app.use(cors({
+// ==================== CONFIGURAÇÃO DE CORS (ANTES DAS ROTAS) ====================
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'https://portal-imobiliario-production.up.railway.app',
+  'https://portal-imobiliario-vert.vercel.app',
+  process.env.FRONTEND_URL,
+  process.env.VERCEL_URL,
+].filter(Boolean) as string[];
+
+const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.some(allowed => allowed && origin.includes(allowed))) {
+    if (!origin || allowedOrigins.some((allowed) => origin.includes(allowed))) {
       return callback(null, true);
     }
     callback(new Error('Not allowed by CORS'));
   },
-  credentials: true
-}));
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // ==================== LOGIN ADMIN OTP ====================
 const ADMIN_PHONE = '+5562981831483';
@@ -144,15 +191,90 @@ app.post('/api/admin/validate-otp', express.json(), (req: Request, res: Response
   if (hashOtp(otp) !== adminOtp.hash) {
     return res.status(400).json({ error: 'Código incorreto.' });
   }
-  // Sucesso: invalida o código
+  // Sucesso: invalida o código e emite JWT
   adminOtp = null;
-  res.json({ ok: true });
+  const token = jwt.sign(
+    { role: 'admin', iat: Math.floor(Date.now() / 1000) },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRATION }
+  );
+  res.json({ ok: true, token });
 });
+
+// ==================== MIDDLEWARE DE AUTENTICAÇÃO ====================
+interface AuthRequest extends Request {
+  user?: { role: string; iat: number };
+}
+
+const authenticateAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Token de autenticação não fornecido' });
+  }
+  
+  const token = authHeader.substring(7);
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { role: string; iat: number };
+    
+    if (decoded.role !== 'admin') {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+    
+    req.user = decoded;
+    next();
+  } catch (error) {
+    if (error instanceof jwt.TokenExpiredError) {
+      return res.status(401).json({ error: 'Token expirado' });
+    }
+    return res.status(401).json({ error: 'Token inválido' });
+  }
+};
+
+type SortImoveis = 'data-desc' | 'data-asc' | 'preco-asc' | 'preco-desc';
+
+const parsePositiveInt = (value: unknown, fallback: number, min: number, max: number) => {
+  const num = typeof value === 'string' ? Number.parseInt(value, 10) : Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.min(max, Math.max(min, Math.trunc(num)));
+};
+
+const parseSortImoveis = (value: unknown): SortImoveis => {
+  const raw = String(value || 'data-desc');
+  if (raw === 'data-asc' || raw === 'preco-asc' || raw === 'preco-desc') return raw;
+  return 'data-desc';
+};
+
+const parseOptionalString = (value: unknown) => {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  return raw.length ? raw : undefined;
+};
+
+const parseOptionalNumber = (value: unknown) => {
+  const raw = typeof value === 'string' ? value.replace(',', '.').trim() : '';
+  if (!raw) return undefined;
+  const num = Number(raw);
+  if (!Number.isFinite(num)) return undefined;
+  return num;
+};
 
 // Escolhe o banco baseado na variável de ambiente
 let db, initializeDatabase;
 
-if (process.env.DATABASE_URL) {
+const dbProvider = String(process.env.DB_PROVIDER || '').toLowerCase();
+
+if (dbProvider === 'sqlite') {
+  console.log('📁 Usando SQLite (DB_PROVIDER=sqlite)');
+  try {
+    const dbModule = await import('./database.js');
+    db = dbModule.default;
+    initializeDatabase = dbModule.initializeDatabase;
+  } catch (error) {
+    console.error('⚠️  SQLite não disponível. Use PostgreSQL em produção.');
+    throw new Error('SQLite indisponível. Verifique dependências/ambiente.');
+  }
+} else if (process.env.DATABASE_URL) {
   // PostgreSQL (produção Railway)
   console.log('🐘 Usando PostgreSQL');
   const dbModule = await import('./database-postgres.js');
@@ -172,33 +294,7 @@ if (process.env.DATABASE_URL) {
   }
 }
 
-// const app = express(); // Removido duplicidade
 const PORT = Number(process.env.PORT) || 4000;
-
-// CORS configurado para produção
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'https://portal-imobiliario-production.up.railway.app',
-  'https://portal-imobiliario-vert.vercel.app',
-  process.env.FRONTEND_URL,
-  process.env.VERCEL_URL
-].filter(Boolean);
-
-app.use(cors({
-  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    // Permite requisições sem 'origin' (ex: apps mobile, Postman) ou se a origem estiver na lista.
-    if (!origin || allowedOrigins.some(allowed => allowed && origin.includes(allowed))) {
-      return callback(null, true);
-    }
-    // Bloqueia outras origens
-    callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true
-}));
-
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Inicializar banco de dados
 console.log('🔧 Inicializando banco de dados...');
@@ -440,7 +536,9 @@ const gerarProximoId = async (tipo: string) => {
 app.get('/health', async (_req: Request, res: Response) => {
   try {
     // Verifica apenas se o servidor está rodando
-    const dbStatus = process.env.DATABASE_URL ? 'postgresql' : 'sqlite';
+    const dbStatus = String(process.env.DB_PROVIDER || '').toLowerCase() === 'sqlite'
+      ? 'sqlite'
+      : (process.env.DATABASE_URL ? 'postgresql' : 'sqlite');
     res.json({ 
       status: 'ok', 
       database: dbStatus,
@@ -460,25 +558,273 @@ app.get('/', (_req: Request, res: Response) => {
   });
 });
 
+// ==================== UPLOAD DE IMAGENS ====================
+
+app.post('/api/upload-image', authenticateAdmin, upload.single('image'), async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Nenhuma imagem fornecida' });
+    }
+
+    const imovelId = req.body.imovelId || 'temp';
+    
+    // Upload para Cloudinary
+    const result = await new Promise<any>((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: `portal-imobiliario/imoveis/${imovelId}`,
+          resource_type: 'image',
+          tags: [imovelId, 'portal-imobiliario'],
+          transformation: [
+            { width: 1200, height: 900, crop: 'limit', quality: 'auto' },
+            { fetch_format: 'auto' }
+          ],
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+      uploadStream.end(req.file!.buffer);
+    });
+
+    res.json({
+      url: result.secure_url,
+      publicId: result.public_id,
+    });
+  } catch (error) {
+    console.error('Erro ao fazer upload:', error);
+    res.status(500).json({ error: 'Erro ao fazer upload da imagem' });
+  }
+});
+
+// Endpoint para deletar imagem do Cloudinary
+app.delete('/api/delete-image', authenticateAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { publicId } = req.body;
+    if (!publicId) {
+      return res.status(400).json({ error: 'publicId é obrigatório' });
+    }
+
+    await cloudinary.uploader.destroy(publicId);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Erro ao deletar imagem:', error);
+    res.status(500).json({ error: 'Erro ao deletar imagem' });
+  }
+});
+
 // ==================== IMÓVEIS ====================
+
+app.get('/api/imoveis/facets', async (req: Request, res: Response) => {
+  try {
+    // status=all (inclui inativos) deve ser admin-only
+    const status = String(req.query.status || '');
+    if (status === 'all') {
+      let allowed = false;
+      authenticateAdmin(req as AuthRequest, res, () => {
+        allowed = true;
+      });
+      if (!allowed) return;
+    }
+
+    const wherePublico = status !== 'all';
+
+    if (db?.prisma) {
+      const where = wherePublico ? { ativo: true } : {};
+      const [bairros, cidades, tipos] = await Promise.all([
+        db.prisma.imovel.findMany({ where, distinct: ['endereco_bairro'], select: { endereco_bairro: true } }),
+        db.prisma.imovel.findMany({ where, distinct: ['endereco_cidade'], select: { endereco_cidade: true } }),
+        db.prisma.imovel.findMany({ where, distinct: ['tipo'], select: { tipo: true } }),
+      ]);
+
+      return res.json({
+        bairros: bairros.map((b: any) => String(b.endereco_bairro || '')).filter((s: string) => s.trim().length).sort((a: string, b: string) => a.localeCompare(b, 'pt-BR')),
+        cidades: cidades.map((c: any) => String(c.endereco_cidade || '')).filter((s: string) => s.trim().length).sort((a: string, b: string) => a.localeCompare(b, 'pt-BR')),
+        tipos: tipos.map((t: any) => String(t.tipo || '')).filter((s: string) => s.trim().length).sort((a: string, b: string) => a.localeCompare(b, 'pt-BR')),
+      });
+    }
+
+    const whereClause = wherePublico ? 'WHERE ativo = ?' : '';
+    const andClause = wherePublico ? 'AND' : 'WHERE';
+    const whereParams: any[] = wherePublico ? [true] : [];
+
+    const [bairrosRows, cidadesRows, tiposRows] = await Promise.all([
+      db.prepare(`SELECT DISTINCT endereco_bairro as v FROM imoveis ${whereClause} ${andClause} endereco_bairro IS NOT NULL AND endereco_bairro != '' ORDER BY endereco_bairro`).all(...whereParams),
+      db.prepare(`SELECT DISTINCT endereco_cidade as v FROM imoveis ${whereClause} ${andClause} endereco_cidade IS NOT NULL AND endereco_cidade != '' ORDER BY endereco_cidade`).all(...whereParams),
+      db.prepare(`SELECT DISTINCT tipo as v FROM imoveis ${whereClause} ${andClause} tipo IS NOT NULL AND tipo != '' ORDER BY tipo`).all(...whereParams),
+    ]);
+
+    res.json({
+      bairros: (bairrosRows || []).map((r: any) => String(r.v || '')).filter((s: string) => s.trim().length),
+      cidades: (cidadesRows || []).map((r: any) => String(r.v || '')).filter((s: string) => s.trim().length),
+      tipos: (tiposRows || []).map((r: any) => String(r.v || '')).filter((s: string) => s.trim().length),
+    });
+  } catch (error) {
+    console.error('Erro ao buscar facets de imóveis:', error);
+    res.status(500).json({ error: 'Erro ao buscar filtros' });
+  }
+});
 
 app.get('/api/imoveis', async (req: Request, res: Response) => {
   try {
-    const { status } = req.query;
-    let query = 'SELECT * FROM imoveis';
-    const params = [];
+    const status = String(req.query.status || '');
 
-    // Para o admin, mostrar todos. Para o público, apenas ativos.
-    if (status !== 'all') {
-      query += ' WHERE ativo = ?';
-      params.push(true);
+    // status=all (inclui inativos) deve ser admin-only
+    if (status === 'all') {
+      let allowed = false;
+      authenticateAdmin(req as AuthRequest, res, () => {
+        allowed = true;
+      });
+      if (!allowed) return;
     }
 
-    query += ' ORDER BY criadoEm DESC';
-    
-    const rows = await db.prepare(query).all(...params);
+    const page = parsePositiveInt(req.query.page, 1, 1, 1_000_000);
+    const limit = parsePositiveInt(req.query.limit, 20, 1, 100);
+    const sort = parseSortImoveis(req.query.sort);
+    const offset = (page - 1) * limit;
+
+    const wherePublico = status !== 'all';
+
+    const filtroId = parseOptionalString(req.query.id);
+    const categoria = parseOptionalString(req.query.categoria);
+    const tipo = parseOptionalString(req.query.tipo);
+    const bairro = parseOptionalString(req.query.bairro);
+    const cidade = parseOptionalString(req.query.cidade);
+    const estado = parseOptionalString(req.query.estado);
+    const precoMin = parseOptionalNumber(req.query.precoMin);
+    const precoMax = parseOptionalNumber(req.query.precoMax);
+    const quartosMin = (() => {
+      const q = parseOptionalNumber(req.query.quartos);
+      if (typeof q !== 'number') return undefined;
+      if (!Number.isFinite(q)) return undefined;
+      return Math.max(0, Math.trunc(q));
+    })();
+
+    // PostgreSQL (Prisma)
+    if (db?.prisma) {
+      const where: any = wherePublico ? { ativo: true } : {};
+      if (filtroId) where.id = { contains: filtroId, mode: 'insensitive' };
+      if (categoria) where.categoria = categoria;
+      if (tipo) where.tipo = tipo;
+      if (bairro) where.endereco_bairro = { contains: bairro, mode: 'insensitive' };
+      if (cidade) where.endereco_cidade = { contains: cidade, mode: 'insensitive' };
+      if (estado) where.endereco_estado = { contains: estado, mode: 'insensitive' };
+      if (typeof precoMin === 'number' || typeof precoMax === 'number') {
+        where.preco = {
+          ...(typeof precoMin === 'number' ? { gte: precoMin } : {}),
+          ...(typeof precoMax === 'number' ? { lte: precoMax } : {}),
+        };
+      }
+      if (typeof quartosMin === 'number' && quartosMin > 0) {
+        where.quartos = { gte: quartosMin };
+      }
+      const orderBy =
+        sort === 'data-asc'
+          ? ({ criadoEm: 'asc' } as const)
+          : sort === 'preco-asc'
+            ? ({ preco: 'asc' } as const)
+            : sort === 'preco-desc'
+              ? ({ preco: 'desc' } as const)
+              : ({ criadoEm: 'desc' } as const);
+
+      const [total, rows] = await Promise.all([
+        db.prisma.imovel.count({ where }),
+        db.prisma.imovel.findMany({ where, orderBy, skip: offset, take: limit }),
+      ]);
+
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+      const mapped = (rows || []).map(mapRowToImovel);
+
+      return res.json({
+        data: mapped,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1,
+        },
+      });
+    }
+
+    // SQLite
+    const conditions: string[] = [];
+    const whereParams: any[] = [];
+    if (wherePublico) {
+      conditions.push('ativo = ?');
+      whereParams.push(true);
+    }
+    if (filtroId) {
+      conditions.push('LOWER(id) LIKE ?');
+      whereParams.push(`%${filtroId.toLowerCase()}%`);
+    }
+    if (categoria) {
+      conditions.push('categoria = ?');
+      whereParams.push(categoria);
+    }
+    if (tipo) {
+      conditions.push('tipo = ?');
+      whereParams.push(tipo);
+    }
+    if (bairro) {
+      conditions.push('LOWER(endereco_bairro) LIKE ?');
+      whereParams.push(`%${bairro.toLowerCase()}%`);
+    }
+    if (cidade) {
+      conditions.push('LOWER(endereco_cidade) LIKE ?');
+      whereParams.push(`%${cidade.toLowerCase()}%`);
+    }
+    if (estado) {
+      conditions.push('LOWER(endereco_estado) LIKE ?');
+      whereParams.push(`%${estado.toLowerCase()}%`);
+    }
+    if (typeof precoMin === 'number') {
+      conditions.push('preco >= ?');
+      whereParams.push(precoMin);
+    }
+    if (typeof precoMax === 'number') {
+      conditions.push('preco <= ?');
+      whereParams.push(precoMax);
+    }
+    if (typeof quartosMin === 'number' && quartosMin > 0) {
+      conditions.push('quartos >= ?');
+      whereParams.push(quartosMin);
+    }
+
+    const whereClause = conditions.length ? ` WHERE ${conditions.join(' AND ')}` : '';
+
+    const orderBy =
+      sort === 'data-asc'
+        ? 'criadoEm ASC'
+        : sort === 'preco-asc'
+          ? 'preco ASC'
+          : sort === 'preco-desc'
+            ? 'preco DESC'
+            : 'criadoEm DESC';
+
+    const countRow = await db.prepare(`SELECT COUNT(*) as total FROM imoveis${whereClause}`).get(...whereParams);
+    const total = Number((countRow as any)?.total || 0);
+
+    const rows = await db
+      .prepare(`SELECT * FROM imoveis${whereClause} ORDER BY ${orderBy} LIMIT ? OFFSET ?`)
+      .all(...whereParams, limit, offset);
+
+    const totalPages = Math.max(1, Math.ceil(total / limit));
     const mapped = (rows || []).map(mapRowToImovel);
-    res.json(mapped);
+
+    res.json({
+      data: mapped,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    });
   } catch (error) {
     console.error('Erro ao buscar imóveis:', error);
     res.status(500).json({ error: 'Erro ao buscar imóveis' });
@@ -499,26 +845,22 @@ app.get('/api/imoveis/:id', async (req: Request, res: Response) => {
   }
 });
 
-app.post('/api/imoveis', async (req: Request, res: Response) => {
+app.post('/api/imoveis', authenticateAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const imovel = req.body;
 
-    // --- Validação ---
-    const camposObrigatorios = ['titulo', 'categoria', 'tipo', 'preco'];
-    const camposFaltantes = camposObrigatorios.filter(campo => 
-      imovel[campo] === null || imovel[campo] === undefined || imovel[campo] === ''
-    );
-
-    if (camposFaltantes.length > 0) {
+    // --- Validação com Zod ---
+    const validation = validateAndFormat(imovelSchema, imovel);
+    if (!validation.success) {
       return res.status(400).json({ 
-        error: `Campos obrigatórios faltando: ${camposFaltantes.join(', ')}.`,
-        detail: `Campos obrigatórios faltando: ${camposFaltantes.join(', ')}.` 
+        error: 'Dados do imóvel inválidos',
+        details: validation.errors
       });
     }
-    // --- Fim da Validação ---
-
-    const novoId = await gerarProximoId(imovel.tipo);
-    console.log(`📝 Gerando novo imóvel: ${novoId} (${imovel.tipo})`);
+    const validatedImovel = validation.data as any;
+    
+    const novoId = await gerarProximoId(validatedImovel.tipo);
+    console.log(`📝 Gerando novo imóvel: ${novoId} (${validatedImovel.tipo})`);
 
     const {
       endereco = {},
@@ -530,16 +872,16 @@ app.post('/api/imoveis', async (req: Request, res: Response) => {
       tipologia = {},
       proprietario = {},
       fotos = [],
-    } = imovel;
+    } = validatedImovel;
 
     const dataToCreate = {
       id: novoId,
-      titulo: imovel.titulo,
-      descricao: imovel.descricao,
-      categoria: imovel.categoria,
-      tipo: imovel.tipo,
-      preco: imovel.preco,
-      ativo: imovel.ativo ?? true,
+      titulo: validatedImovel.titulo,
+      descricao: validatedImovel.descricao,
+      categoria: validatedImovel.categoria,
+      tipo: validatedImovel.tipo,
+      preco: validatedImovel.preco,
+      ativo: validatedImovel.ativo ?? true,
 
       // Endereço
       endereco_logradouro: endereco.logradouro,
@@ -660,7 +1002,7 @@ app.post('/api/imoveis', async (req: Request, res: Response) => {
   }
 });
 
-app.put('/api/imoveis/:id', async (req: Request, res: Response) => {
+app.put('/api/imoveis/:id', authenticateAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const imovel = req.body;
@@ -717,7 +1059,7 @@ app.put('/api/imoveis/:id', async (req: Request, res: Response) => {
   }
 });
 
-app.delete('/api/imoveis/:id', async (req: Request, res: Response) => {
+app.delete('/api/imoveis/:id', authenticateAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     await db.prepare('DELETE FROM imoveis WHERE id = ?').run(id);
@@ -730,18 +1072,99 @@ app.delete('/api/imoveis/:id', async (req: Request, res: Response) => {
 
 // ==================== LEADS ====================
 
-app.get('/api/leads', async (_req: Request, res: Response) => {
+app.get('/api/leads/stats', authenticateAdmin, async (_req: AuthRequest, res: Response) => {
   try {
-    const leads = await db.prepare('SELECT * FROM leads ORDER BY criadoEm DESC').all();
-    console.log('📊 GET /api/leads:', leads?.length || 0, 'found');
-    if (leads && leads.length > 0) {
-      console.log('  Raw lead 0:', leads[0]);
+    if (db?.prisma) {
+      const [total, naoVisualizados] = await Promise.all([
+        db.prisma.lead.count(),
+        db.prisma.lead.count({ where: { visualizado: false } }),
+      ]);
+      return res.json({ total, naoVisualizados });
     }
+
+    const totalRow = await db.prepare('SELECT COUNT(*) as total FROM leads').get();
+    const naoRow = await db.prepare('SELECT COUNT(*) as total FROM leads WHERE visualizado = ?').get(false);
+    return res.json({
+      total: Number((totalRow as any)?.total || 0),
+      naoVisualizados: Number((naoRow as any)?.total || 0),
+    });
+  } catch (error) {
+    console.error('Erro ao buscar stats de leads:', error);
+    res.status(500).json({ error: 'Erro ao buscar estatísticas de leads' });
+  }
+});
+
+app.get('/api/leads', authenticateAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const page = parsePositiveInt(req.query.page, 1, 1, 1_000_000);
+    const limit = parsePositiveInt(req.query.limit, 50, 1, 200);
+    const offset = (page - 1) * limit;
+
+    const visualizadoRaw = typeof req.query.visualizado === 'string' ? req.query.visualizado : undefined;
+    const sortRaw = typeof req.query.sort === 'string' ? req.query.sort : 'data-desc';
+    const sort = sortRaw === 'data-asc' ? 'data-asc' : 'data-desc';
+    const filterVisualizado = visualizadoRaw === 'true' ? true : visualizadoRaw === 'false' ? false : undefined;
+
+    // PostgreSQL (Prisma)
+    if (db?.prisma) {
+      const where = typeof filterVisualizado === 'boolean' ? { visualizado: filterVisualizado } : {};
+      const [total, rows] = await Promise.all([
+        db.prisma.lead.count({ where }),
+        db.prisma.lead.findMany({
+          where,
+          orderBy: { criadoEm: sort === 'data-asc' ? 'asc' : 'desc' },
+          skip: offset,
+          take: limit,
+        }),
+      ]);
+
+      const mapped = (rows || []).map(mapRowToLead);
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+
+      return res.json({
+        data: mapped,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1,
+        },
+      });
+    }
+
+    // SQLite
+    const conditions: string[] = [];
+    const whereParams: any[] = [];
+    if (typeof filterVisualizado === 'boolean') {
+      conditions.push('visualizado = ?');
+      whereParams.push(filterVisualizado);
+    }
+    const whereClause = conditions.length ? ` WHERE ${conditions.join(' AND ')}` : '';
+    const orderBy = sort === 'data-asc' ? 'criadoEm ASC' : 'criadoEm DESC';
+
+    const countRow = await db.prepare(`SELECT COUNT(*) as total FROM leads${whereClause}`).get(...whereParams);
+    const total = Number((countRow as any)?.total || 0);
+
+    const leads = await db
+      .prepare(`SELECT * FROM leads${whereClause} ORDER BY ${orderBy} LIMIT ? OFFSET ?`)
+      .all(...whereParams, limit, offset);
+
     const mapped = (leads || []).map(mapRowToLead);
-    if (mapped.length > 0) {
-      console.log('  Mapped lead 0:', mapped[0]);
-    }
-    res.json(mapped);
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    res.json({
+      data: mapped,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    });
   } catch (error) {
     console.error('Erro ao buscar leads:', error);
     res.status(500).json({ error: 'Erro ao buscar leads' });
@@ -750,30 +1173,45 @@ app.get('/api/leads', async (_req: Request, res: Response) => {
 
 app.post('/api/leads', async (req: Request, res: Response) => {
   try {
-    const {
-      id,
-      imovelId,
-      imovelTitulo,
-      nomeCliente,
-      telefoneCliente,
-      emailCliente,
-      cliente = {},
-    } = req.body || {};
+    const bodyLead = req.body || {};
+    
+    // Normaliza dados para o schema esperado
+    const leadData = {
+      id: bodyLead.id,
+      imovelId: bodyLead.imovelId,
+      imovelTitulo: bodyLead.imovelTitulo || bodyLead.titulo,
+      cliente: {
+        nome: bodyLead.nomeCliente || bodyLead.cliente?.nome,
+        email: bodyLead.emailCliente || bodyLead.cliente?.email,
+        telefone: bodyLead.telefoneCliente || bodyLead.cliente?.telefone,
+      },
+      data: new Date(),
+      visualizado: false,
+    };
 
-    const nome = nomeCliente || cliente.nome;
-    const telefone = telefoneCliente || cliente.telefone;
-    const email = emailCliente || cliente.email;
-    const titulo = imovelTitulo || req.body?.titulo;
-
-    console.log('📝 Lead POST:', { id, imovelId, titulo, nome, email, telefone });
-    if (!id || !imovelId || !titulo || !nome || !telefone || !email) {
-      console.error('❌ Missing:', { id: !!id, imovelId: !!imovelId, titulo: !!titulo, nome: !!nome, telefone: !!telefone, email: !!email });
-      return res.status(400).json({ error: 'Campos obrigatórios ausentes para lead' });
+    // --- Validação com Zod ---
+    const validation = validateAndFormat(leadSchema, leadData);
+    if (!validation.success) {
+      console.error('❌ Lead inválido:', validation.errors);
+      return res.status(400).json({ 
+        error: 'Dados do lead inválidos',
+        details: validation.errors
+      });
     }
+    const validatedLead = validation.data as any;
+    console.log('📝 Lead POST:', { id: validatedLead.id, imovelId: validatedLead.imovelId, titulo: validatedLead.imovelTitulo });
+    
     const stmt = db.prepare(
-      'INSERT INTO leads (id, imovelId, imovelTitulo, clienteNome, clienteEmail, clienteTelefone) VALUES (?, ?, ?, ?, ?, ?)' // Removido campo mensagem
+      'INSERT INTO leads (id, imovelId, imovelTitulo, clienteNome, clienteEmail, clienteTelefone) VALUES (?, ?, ?, ?, ?, ?)'
     );
-    await stmt.run(id, imovelId, titulo, nome, email, telefone);
+    await stmt.run(
+      validatedLead.id || gerarId(),
+      validatedLead.imovelId,
+      validatedLead.imovelTitulo,
+      validatedLead.cliente.nome,
+      validatedLead.cliente.email,
+      validatedLead.cliente.telefone
+    );
     res.json({ ok: true });
   } catch (error) {
     console.error('Erro ao criar lead:', error);
@@ -781,7 +1219,7 @@ app.post('/api/leads', async (req: Request, res: Response) => {
   }
 });
 
-app.patch('/api/leads/:id', async (req: Request, res: Response) => {
+app.patch('/api/leads/:id', authenticateAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     await db.prepare('UPDATE leads SET visualizado = ? WHERE id = ?').run(true, id);
@@ -795,11 +1233,18 @@ app.patch('/api/leads/:id', async (req: Request, res: Response) => {
 // ==================== E-MAIL ====================
 
 app.post('/api/send-lead', async (req: Request, res: Response) => {
-  const { imovelId, imovelTitulo, preco, endereco, contato, link } = req.body || {};
+  const payload = req.body || {};
 
-  if (!contato?.nome || !contato?.telefone || !contato?.email || !imovelId || !imovelTitulo) {
-    return res.status(400).json({ error: 'Campos obrigatórios ausentes' });
+  // --- Validação com Zod ---
+  const validation = validateAndFormat(sendLeadEmailSchema, payload);
+  if (!validation.success) {
+    return res.status(400).json({ 
+      error: 'Dados do lead inválidos',
+      details: validation.errors
+    });
   }
+  
+  const { imovelId, imovelTitulo, preco, endereco, contato, link } = validation.data as any;
 
   const to = process.env.MAIL_TO || process.env.MAIL_USER;
   const assunto = `Novo lead - ${imovelTitulo}`;
@@ -885,6 +1330,9 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Servidor rodando na porta ${PORT}`);
   console.log(`🌐 Ambiente: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`💾 Database: ${process.env.DATABASE_URL ? 'PostgreSQL' : 'SQLite'}`);
+  const dbLog = String(process.env.DB_PROVIDER || '').toLowerCase() === 'sqlite'
+    ? 'SQLite'
+    : (process.env.DATABASE_URL ? 'PostgreSQL' : 'SQLite');
+  console.log(`💾 Database: ${dbLog}`);
   console.log(`🚀 Health check: http://localhost:${PORT}/health`);
 });

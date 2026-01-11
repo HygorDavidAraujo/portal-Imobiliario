@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useImoveis } from '../contexts/ImoveisContext';
 import { Imovel, CategoriaImovel, TipoComercial, TipoResidencial, TipoRural, TipoAlqueire, Foto } from '../types';
-import { gerarId, validarCPF, validarEmail, validarTelefone, formatarValorBrasileiro, converterValorBrasileiroParaNumero, fileToBase64 } from '../utils/helpers';
+import { validarCPF, validarEmail, validarTelefone, formatarValorBrasileiro, converterValorBrasileiroParaNumero } from '../utils/helpers';
 import { Upload, X, Check, ArrowLeft, Save } from 'lucide-react';
 
 const tiposComercial: TipoComercial[] = ['Casa', 'Sobrado', 'Sala', 'Área/Lote'];
@@ -228,22 +228,57 @@ export const GerenciamentoImoveis: React.FC = () => {
     setCpfProprietario(imovel.proprietario.cpf);
   };
 
+  const [uploadingImages, setUploadingImages] = React.useState(false);
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
+    if (!e.target.files || e.target.files.length === 0) return;
+    
+    setUploadingImages(true);
+    const files = Array.from(e.target.files);
+    const token = localStorage.getItem('adminToken');
+    
+    if (!token) {
+      setErros(['Você precisa estar autenticado para fazer upload de imagens']);
+      setUploadingImages(false);
+      return;
+    }
+    
+    try {
       const novasFotos: Foto[] = [];
       
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const base64 = await fileToBase64(file);
+        const formData = new FormData();
+        formData.append('image', file);
+        formData.append('imovelId', id || 'novo');
+        
+        const response = await fetch(`${apiBaseUrl}/api/upload-image`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          throw new Error('Erro ao fazer upload da imagem');
+        }
+        
+        const data = await response.json();
         novasFotos.push({
-          id: gerarId(),
-          url: base64,
+          id: data.publicId,
+          url: data.url,
           isDestaque: fotos.length === 0 && i === 0,
         });
       }
       
       setFotos(prev => [...prev, ...novasFotos]);
+    } catch (error) {
+      console.error('Erro ao fazer upload:', error);
+      setErros(['Erro ao fazer upload das imagens. Tente novamente.']);
+    } finally {
+      setUploadingImages(false);
     }
   };
 
@@ -343,8 +378,8 @@ export const GerenciamentoImoveis: React.FC = () => {
         varandaGourmet,
         piscinaPrivativa,
         churrasqueiraPrivativa,
-        valorIptu: sanitize(converterValorBrasileiroParaNumero(valorIptu)),
-        valorItu: sanitize(converterValorBrasileiroParaNumero(valorItu)),
+        valorIptu: categoria === 'Rural' ? undefined : sanitize(converterValorBrasileiroParaNumero(valorIptu)),
+        valorItu: categoria === 'Rural' ? undefined : sanitize(converterValorBrasileiroParaNumero(valorItu)),
       },
       tipologia: {
         ...baseImovel.tipologia,
@@ -1064,37 +1099,39 @@ export const GerenciamentoImoveis: React.FC = () => {
                   <span className="text-sm text-slate-700">Mobiliado</span>
                 </label>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Valor {isLote ? 'ITU' : 'IPTU'} (R$)
-                </label>
-                <input
-                  type="text"
-                  value={isLote ? valorItu : valorIptu}
-                  onChange={(e) => {
-                    const valor = e.target.value;
-                    if (/^[0-9.,]*$/.test(valor)) {
-                      if (isLote) {
-                        setValorItu(valor);
-                      } else {
-                        setValorIptu(valor);
+              {!isRural && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Valor {isLote ? 'ITU' : 'IPTU'} (R$)
+                  </label>
+                  <input
+                    type="text"
+                    value={isLote ? valorItu : valorIptu}
+                    onChange={(e) => {
+                      const valor = e.target.value;
+                      if (/^[0-9.,]*$/.test(valor)) {
+                        if (isLote) {
+                          setValorItu(valor);
+                        } else {
+                          setValorIptu(valor);
+                        }
                       }
-                    }
-                  }}
-                  onBlur={(e) => {
-                    const num = converterValorBrasileiroParaNumero(e.target.value);
-                    if (num > 0) {
-                      if (isLote) {
-                        setValorItu(formatarValorBrasileiro(num));
-                      } else {
-                        setValorIptu(formatarValorBrasileiro(num));
+                    }}
+                    onBlur={(e) => {
+                      const num = converterValorBrasileiroParaNumero(e.target.value);
+                      if (num > 0) {
+                        if (isLote) {
+                          setValorItu(formatarValorBrasileiro(num));
+                        } else {
+                          setValorIptu(formatarValorBrasileiro(num));
+                        }
                       }
-                    }
-                  }}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="0,00"
-                />
-              </div>
+                    }}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0,00"
+                  />
+                </div>
+              )}
             </div>
 
             {isCasa && (
@@ -1269,24 +1306,24 @@ export const GerenciamentoImoveis: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Valor ITU */}
+                {/* Valor ITR */}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Valor ITU (R$)
+                    Valor ITR (R$)
                   </label>
                   <input
                     type="text"
-                    value={valorItu}
+                    value={valorItr}
                     onChange={(e) => {
                       const valor = e.target.value;
                       if (/^[0-9.,]*$/.test(valor)) {
-                        setValorItu(valor);
+                        setValorItr(valor);
                       }
                     }}
                     onBlur={(e) => {
                       const num = converterValorBrasileiroParaNumero(e.target.value);
                       if (num > 0) {
-                        setValorItu(formatarValorBrasileiro(num));
+                        setValorItr(formatarValorBrasileiro(num));
                       }
                     }}
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -1438,16 +1475,28 @@ export const GerenciamentoImoveis: React.FC = () => {
               Fotos (mínimo 4) *
             </h2>
             <div className="space-y-4">
-              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
-                <Upload className="text-slate-400 mb-2" size={32} />
-                <span className="text-sm text-slate-600">Clique para adicionar fotos</span>
-                <span className="text-xs text-slate-500 mt-1">PNG, JPG ou GIF (max. 5MB cada)</span>
+              <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-300 rounded-lg transition-colors ${
+                uploadingImages ? 'cursor-wait opacity-60' : 'cursor-pointer hover:border-blue-500'
+              }`}>
+                {uploadingImages ? (
+                  <>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
+                    <span className="text-sm text-slate-600 font-medium">Enviando imagens...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="text-slate-400 mb-2" size={32} />
+                    <span className="text-sm text-slate-600">Clique para adicionar fotos</span>
+                    <span className="text-xs text-slate-500 mt-1">PNG, JPG ou GIF (max. 5MB cada)</span>
+                  </>
+                )}
                 <input
                   type="file"
                   multiple
                   accept="image/*"
                   onChange={handleFileChange}
                   className="hidden"
+                  disabled={uploadingImages}
                 />
               </label>
                             

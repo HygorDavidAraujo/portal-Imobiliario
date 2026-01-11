@@ -105,6 +105,23 @@ export const obterFotoDestaque = (fotos: { isDestaque: boolean; url: string }[])
   return fotoDestaque?.url || fotos[0]?.url || '/placeholder-imovel.jpg';
 };
 
+export const otimizarUrlCloudinary = (url: string, opts?: { width?: number }) => {
+  if (!url) return url;
+  const marker = '/upload/';
+  const idx = url.indexOf(marker);
+  if (idx < 0) return url;
+
+  const after = url.slice(idx + marker.length);
+  const firstSegment = after.split('/')[0] || '';
+
+  // Se já existe transformação (não começa com v123...), não mexe.
+  if (!/^v\d+$/.test(firstSegment)) return url;
+
+  const width = opts?.width;
+  const transform = `f_auto,q_auto${typeof width === 'number' ? `,w_${Math.max(1, Math.trunc(width))}` : ''}`;
+  return url.replace(marker, `${marker}${transform}/`);
+};
+
 export const enviarWhatsApp = (telefone: string, mensagem: string): void => {
   const cleaned = telefone.replace(/\D/g, '');
   const url = `https://wa.me/${cleaned}?text=${encodeURIComponent(mensagem)}`;
@@ -146,52 +163,4 @@ export const obterM2PorAlqueire = (tipoAlqueire: 'Goiano' | 'Paulista' | 'Baiano
     'Baiano': 96800,
   };
   return conversoes[tipoAlqueire];
-};
-
-
-export const fileToBase64 = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        // Comprimir a imagem usando canvas
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Erro ao processar imagem'));
-          return;
-        }
-
-        // Redimensionar mantendo proporção
-        let width = img.width;
-        let height = img.height;
-        const maxSize = 1200; // Tamanho máximo em pixels
-
-        if (width > height) {
-          if (width > maxSize) {
-            height = (height * maxSize) / width;
-            width = maxSize;
-          }
-        } else {
-          if (height > maxSize) {
-            width = (width * maxSize) / height;
-            height = maxSize;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        ctx.drawImage(img, 0, 0, width, height);
-
-        // Converter para base64 com qualidade reduzida (0.7 = 70%)
-        const compressed = canvas.toDataURL('image/jpeg', 0.7);
-        resolve(compressed);
-      };
-      img.onerror = () => reject(new Error('Erro ao carregar imagem'));
-      img.src = reader.result as string;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 };

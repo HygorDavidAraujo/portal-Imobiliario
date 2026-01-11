@@ -2,18 +2,17 @@
 import { useImoveis } from '../contexts/ImoveisContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { Building2, Users, Home, Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
-import { obterFotoDestaque, formatarMoeda } from '../utils/helpers';
+import { obterFotoDestaque, formatarMoeda, otimizarUrlCloudinary } from '../utils/helpers';
 
 export const Admin: React.FC = () => {
-  const { imoveis, removerImovel, atualizarImovel, leads } = useImoveis();
+  const { imoveis, removerImovel, atualizarImovel, leadsNaoVisualizados } = useImoveis();
   const navigate = useNavigate();
 
   const handleLogout = () => {
     localStorage.removeItem('adminSession');
+    localStorage.removeItem('adminToken');
     navigate('/admin/login', { replace: true });
   };
-
-  const leadsNaoVisualizados = leads.filter(l => !l.visualizado).length;
 
   const handleToggleAtivo = async (imovel: any) => {
     try {
@@ -118,8 +117,10 @@ export const Admin: React.FC = () => {
                   {/* Foto */}
                   <div className="md:w-64 h-48 md:h-auto bg-slate-200 flex-shrink-0">
                     <img
-                      src={obterFotoDestaque(imovel.fotos)}
+                      src={otimizarUrlCloudinary(obterFotoDestaque(imovel.fotos), { width: 700 })}
                       alt={imovel.titulo}
+                      loading="lazy"
+                      decoding="async"
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
