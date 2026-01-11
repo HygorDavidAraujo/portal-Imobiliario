@@ -44,12 +44,38 @@ export const DetalhesImovel: React.FC = () => {
 
   if (!imovel) return null;
 
+  const totalFotos = Array.isArray(imovel.fotos) ? imovel.fotos.length : 0;
+  const placeholderFoto =
+    'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="600"%3E%3Crect fill="%23e2e8f0" width="800" height="600"/%3E%3Ctext fill="%2394a3b8" font-family="sans-serif" font-size="32" x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle"%3ESem imagem%3C/text%3E%3C/svg%3E';
+
   const proximaFoto = () => {
-    setFotoAtual((prev) => (prev + 1) % imovel.fotos.length);
+    if (totalFotos <= 1) return;
+    setFotoAtual((prev) => (prev + 1) % totalFotos);
   };
 
   const fotoAnterior = () => {
-    setFotoAtual((prev) => (prev - 1 + imovel.fotos.length) % imovel.fotos.length);
+    if (totalFotos <= 1) return;
+    setFotoAtual((prev) => (prev - 1 + totalFotos) % totalFotos);
+  };
+
+  const handleGaleriaKeyDown = (e: React.KeyboardEvent) => {
+    if (totalFotos <= 1) return;
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      fotoAnterior();
+    }
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      proximaFoto();
+    }
+    if (e.key === 'Home') {
+      e.preventDefault();
+      setFotoAtual(0);
+    }
+    if (e.key === 'End') {
+      e.preventDefault();
+      setFotoAtual(totalFotos - 1);
+    }
   };
 
   const handleFavoritar = () => {
@@ -153,7 +179,7 @@ export const DetalhesImovel: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-white hover:text-gold-400 transition-colors"
+            className="flex items-center gap-2 text-white hover:text-gold-400 transition-colors rounded-lg px-2 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
           >
             <ArrowLeft size={20} />
             Voltar ao catálogo
@@ -167,51 +193,76 @@ export const DetalhesImovel: React.FC = () => {
           <div className="lg:col-span-2 space-y-6">
             {/* Galeria de Fotos */}
             <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-              <div className="relative h-96 bg-slate-200">
+              <div
+                className="relative h-96 bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                role="region"
+                aria-label="Galeria de fotos"
+                tabIndex={0}
+                onKeyDown={handleGaleriaKeyDown}
+              >
                 <img
-                  src={otimizarUrlCloudinary(imovel.fotos[fotoAtual]?.url, { width: 1400 })}
-                  alt={`Foto ${fotoAtual + 1}`}
+                  src={
+                    imovel.fotos?.[fotoAtual]?.url
+                      ? otimizarUrlCloudinary(imovel.fotos[fotoAtual].url, { width: 1400 })
+                      : placeholderFoto
+                  }
+                  alt={
+                    totalFotos > 0
+                      ? `Foto ${fotoAtual + 1} de ${totalFotos} - ${imovel.titulo}`
+                      : `Sem foto - ${imovel.titulo}`
+                  }
                   loading="eager"
                   decoding="async"
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
-                    target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="600"%3E%3Crect fill="%23e2e8f0" width="800" height="600"/%3E%3Ctext fill="%2394a3b8" font-family="sans-serif" font-size="32" x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle"%3ESem imagem%3C/text%3E%3C/svg%3E';
+                    target.src = placeholderFoto;
                   }}
                 />
-                {imovel.fotos.length > 1 && (
+                {totalFotos > 1 && (
                   <>
                     <button
+                      type="button"
                       onClick={fotoAnterior}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors"
+                      aria-label="Foto anterior"
+                      className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black/30"
                     >
                       <ChevronLeft size={24} />
                     </button>
                     <button
+                      type="button"
                       onClick={proximaFoto}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors"
+                      aria-label="Próxima foto"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black/30"
                     >
                       <ChevronRight size={24} />
                     </button>
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+                    <div
+                      className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 text-white px-3 py-1 rounded-full text-sm"
+                      aria-live="polite"
+                      aria-atomic="true"
+                    >
                       {fotoAtual + 1} / {imovel.fotos.length}
                     </div>
                   </>
                 )}
               </div>
-              {imovel.fotos.length > 1 && (
-                <div className="p-4 flex gap-2 overflow-x-auto">
+              {totalFotos > 1 && (
+                <div className="p-4 flex gap-2 overflow-x-auto" aria-label="Miniaturas">
                   {imovel.fotos.map((foto, index) => (
                     <button
+                      type="button"
                       key={foto.id}
                       onClick={() => setFotoAtual(index)}
+                      aria-label={`Selecionar foto ${index + 1} de ${totalFotos}`}
+                      aria-current={index === fotoAtual}
                       className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
                         index === fotoAtual ? 'border-blue-600' : 'border-transparent'
-                      }`}
+                      } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2`}
                     >
                       <img
                         src={otimizarUrlCloudinary(foto.url, { width: 220 })}
-                        alt={`Miniatura ${index + 1}`}
+                        alt={`Miniatura ${index + 1} - ${imovel.titulo}`}
                         loading="lazy"
                         decoding="async"
                         className="w-full h-full object-cover"
@@ -229,7 +280,7 @@ export const DetalhesImovel: React.FC = () => {
                   <span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold mb-2">
                     {imovel.categoria} - {imovel.tipo}
                   </span>
-                  <h1 className="text-3xl font-bold text-slate-800">{imovel.titulo}</h1>
+                  <h1 className="text-3xl font-bold text-slate-800 font-display">{imovel.titulo}</h1>
                 </div>
                 <div className="text-right">
                   <div className="text-sm text-slate-600 mb-1">{imovel.tipologia.tipoVenda}</div>
@@ -621,7 +672,9 @@ export const DetalhesImovel: React.FC = () => {
                   favorito
                     ? 'bg-red-500 text-white hover:bg-red-600'
                     : 'bg-white text-slate-700 border-2 border-slate-300 hover:border-red-500 hover:text-red-500'
-                }`}
+                } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2`}
+                aria-pressed={favorito}
+                aria-label={favorito ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
               >
                 <Heart size={20} fill={favorito ? 'currentColor' : 'none'} />
                 {favorito ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}
@@ -629,7 +682,7 @@ export const DetalhesImovel: React.FC = () => {
 
               <button
                 onClick={handleInteresse}
-                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 font-semibold text-lg mb-4"
+                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 font-semibold text-lg mb-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
               >
                 <MessageCircle size={24} />
                 Me Interessei
@@ -638,14 +691,14 @@ export const DetalhesImovel: React.FC = () => {
               <div className="space-y-3 pt-4 border-t border-slate-200">
                 <a
                   href="tel:5562981831483"
-                  className="flex items-center gap-3 text-slate-700 hover:text-blue-600 transition-colors"
+                  className="flex items-center gap-3 text-slate-700 hover:text-blue-600 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                 >
                   <Phone size={20} />
                   <span>(62) 98183-1483</span>
                 </a>
                 <a
                   href="mailto:hygordavidaraujo@gmail.com"
-                  className="flex items-center gap-3 text-slate-700 hover:text-blue-600 transition-colors"
+                  className="flex items-center gap-3 text-slate-700 hover:text-blue-600 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                 >
                   <Mail size={20} />
                   <span>hygordavidaraujo@gmail.com</span>
@@ -664,7 +717,8 @@ export const DetalhesImovel: React.FC = () => {
               <h3 className="text-2xl font-bold text-slate-800">Seus Dados</h3>
               <button
                 onClick={() => setMostrarFormulario(false)}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
+                className="text-slate-400 hover:text-slate-600 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                aria-label="Fechar modal"
               >
                 <XIcon size={24} />
               </button>

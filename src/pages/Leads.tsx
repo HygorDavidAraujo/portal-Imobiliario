@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useImoveis } from '../contexts/ImoveisContext';
 import { formatarMoeda, obterFotoDestaque, formatarTelefone, otimizarUrlCloudinary } from '../utils/helpers';
 import { Users, Eye, Home, Building2, Mail, Phone, Calendar } from 'lucide-react';
+import { Skeleton } from '../components/Skeleton';
 
 export const Leads: React.FC = () => {
   const {
@@ -64,7 +65,7 @@ export const Leads: React.FC = () => {
             <div className="flex items-center gap-4">
               <Users size={32} className="text-gold-400" />
               <div>
-                <h1 className="text-3xl font-bold">Leads e Contatos</h1>
+                <h1 className="text-3xl font-bold font-display">Leads e Contatos</h1>
                 <p className="text-slate-300 text-sm">
                   {leadsNaoVisualizados > 0 && (
                     <span className="bg-red-500 px-2 py-1 rounded-full text-xs font-semibold mr-2">
@@ -78,14 +79,14 @@ export const Leads: React.FC = () => {
             <div className="flex gap-4">
               <Link
                 to="/admin"
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
               >
                 <Building2 size={20} />
                 Imóveis
               </Link>
               <Link
                 to="/"
-                className="px-4 py-2 bg-white text-slate-800 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-white text-slate-800 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
               >
                 <Home size={20} />
                 Ver Catálogo
@@ -102,7 +103,8 @@ export const Leads: React.FC = () => {
             <select
               value={filtroLeadsVisualizado}
               onChange={(e) => void aplicarFiltroLeadsVisualizado(e.target.value as any)}
-              className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
+              aria-label="Filtrar leads"
+              className="px-4 py-3 md:px-3 md:py-2 min-h-11 border border-slate-300 rounded-lg text-base md:text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="all">Todos</option>
               <option value="nao-visualizados">Não visualizados</option>
@@ -113,7 +115,8 @@ export const Leads: React.FC = () => {
             <select
               value={sortLeadsAtual}
               onChange={(e) => void definirOrdenacaoLeads(e.target.value as any)}
-              className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
+              aria-label="Ordenar leads"
+              className="px-4 py-3 md:px-3 md:py-2 min-h-11 border border-slate-300 rounded-lg text-base md:text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="data-desc">Mais recentes</option>
               <option value="data-asc">Mais antigos</option>
@@ -128,7 +131,40 @@ export const Leads: React.FC = () => {
           )}
         </div>
 
-        {leads.length === 0 ? (
+        {carregandoLeads && leads.length === 0 ? (
+          <div className="space-y-4" aria-label="Carregando leads">
+            {Array.from({ length: 6 }).map((_, idx) => (
+              <div key={idx} className="bg-white rounded-lg shadow-lg overflow-hidden">
+                <div className="flex flex-col md:flex-row">
+                  <Skeleton className="md:w-48 h-32 md:h-auto bg-slate-200" />
+                  <div className="flex-1 p-6 space-y-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-6 w-40 rounded" />
+                        <Skeleton className="h-4 w-56 rounded" />
+                      </div>
+                      <Skeleton className="h-5 w-20 rounded" />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <Skeleton className="h-5 w-56 rounded" />
+                      <Skeleton className="h-5 w-64 rounded" />
+                    </div>
+                    <div className="bg-slate-50 rounded-lg p-3 space-y-2">
+                      <Skeleton className="h-4 w-40 rounded" />
+                      <Skeleton className="h-5 w-3/4 rounded" />
+                      <Skeleton className="h-4 w-24 rounded" />
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      <Skeleton className="h-10 w-28 rounded-lg" />
+                      <Skeleton className="h-10 w-44 rounded-lg" />
+                      <Skeleton className="h-10 w-28 rounded-lg" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : leads.length === 0 ? (
           <div className="bg-white rounded-lg shadow-lg p-12 text-center">
             <Users size={64} className="mx-auto text-slate-300 mb-4" />
             <h3 className="text-xl font-semibold text-slate-600 mb-2">
@@ -139,7 +175,7 @@ export const Leads: React.FC = () => {
             </p>
             <Link
               to="/"
-              className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
             >
               <Home size={20} />
               Ver Catálogo
@@ -203,7 +239,7 @@ export const Leads: React.FC = () => {
                           {telefone ? (
                             <a
                               href={`tel:${telefone}`}
-                              className="hover:text-blue-600 transition-colors"
+                              className="hover:text-blue-600 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                             >
                               {formatarTelefone(telefone)}
                             </a>
@@ -216,7 +252,7 @@ export const Leads: React.FC = () => {
                           {email ? (
                             <a
                               href={`mailto:${email}`}
-                              className="hover:text-blue-600 transition-colors truncate"
+                              className="hover:text-blue-600 transition-colors truncate rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                             >
                               {email}
                             </a>
@@ -240,13 +276,14 @@ export const Leads: React.FC = () => {
                         {imovel && (
                           <Link
                             to={`/imovel/${imovel.id}`}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                           >
                             Ver Imóvel
                           </Link>
                         )}
                         {!lead.visualizado && (
                           <button
+                            type="button"
                             onClick={async () => {
                               try {
                                 await marcarLeadComoVisualizado(lead.id);
@@ -254,7 +291,7 @@ export const Leads: React.FC = () => {
                                 console.error('Erro ao marcar lead como visualizado:', error);
                               }
                             }}
-                            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                           >
                             <Eye size={16} />
                             Marcar como Visualizado
@@ -264,7 +301,7 @@ export const Leads: React.FC = () => {
                           href={`https://wa.me/${(lead.cliente?.telefone || '').replace(/\D/g, '')}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
+                          className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                         >
                           WhatsApp
                         </a>
@@ -278,9 +315,10 @@ export const Leads: React.FC = () => {
             {paginacaoLeads?.hasNextPage && (
               <div className="flex justify-center pt-4">
                 <button
+                  type="button"
                   onClick={() => void carregarProximaPaginaLeads()}
                   disabled={carregandoLeads}
-                  className="px-6 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors font-semibold"
+                  className="px-6 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                 >
                   {carregandoLeads ? 'Carregando...' : 'Carregar mais'}
                 </button>

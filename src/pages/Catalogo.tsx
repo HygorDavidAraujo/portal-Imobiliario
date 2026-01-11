@@ -5,6 +5,7 @@ import { FiltrosCatalogo, Imovel } from '../types';
 import { formatarMoeda, obterFotoDestaque, otimizarUrlCloudinary } from '../utils/helpers';
 import { Phone, Mail, Facebook, Instagram, MapPin, Bed, Bath, Car, Maximize, Search, Filter, Heart } from 'lucide-react';
 import logo from '../img/logo.png';
+import { Skeleton } from '../components/Skeleton';
 
 export const Catalogo: React.FC = () => {
   const {
@@ -124,6 +125,7 @@ export const Catalogo: React.FC = () => {
                   href="https://facebook.com/Corretor.hygoraraujo"
                   target="_blank"
                   rel="noopener noreferrer"
+                  aria-label="Facebook"
                   className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors"
                 >
                   <Facebook size={16} />
@@ -132,6 +134,7 @@ export const Catalogo: React.FC = () => {
                   href="https://instagram.com/corretor.hygoraraujo"
                   target="_blank"
                   rel="noopener noreferrer"
+                  aria-label="Instagram"
                   className="w-8 h-8 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center hover:from-purple-700 hover:to-pink-700 transition-colors"
                 >
                   <Instagram size={16} />
@@ -146,27 +149,32 @@ export const Catalogo: React.FC = () => {
       <div className="bg-white shadow-md sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <button
+            type="button"
             onClick={() => setMostrarFiltros(!mostrarFiltros)}
-            className="flex items-center gap-2 text-slate-700 hover:text-blue-600 transition-colors mb-3 md:hidden"
+            aria-controls="catalogo-filtros"
+            aria-expanded={mostrarFiltros}
+            className="flex items-center gap-2 text-slate-700 hover:text-blue-600 transition-colors mb-3 md:hidden min-h-11 px-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
           >
             <Filter size={20} />
             {mostrarFiltros ? 'Ocultar Filtros' : 'Mostrar Filtros'}
           </button>
 
-          <div className={`${mostrarFiltros ? 'block' : 'hidden'} md:block`}>
+          <div id="catalogo-filtros" role="region" aria-label="Filtros do catálogo" className={`${mostrarFiltros ? 'block' : 'hidden'} md:block`}>
             <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
               <input
                 type="text"
                 placeholder="Buscar por ID..."
                 value={filtros.id || ''}
                 onChange={(e) => setFiltros({ ...filtros, id: e.target.value })}
-                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                aria-label="Buscar por ID"
+                className="px-4 py-3 md:px-3 md:py-2 min-h-11 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base md:text-sm"
               />
 
               <select
                 value={filtros.categoria || ''}
                 onChange={(e) => setFiltros({ ...filtros, categoria: e.target.value as any, tipo: undefined })}
-                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                aria-label="Categoria"
+                className="px-4 py-3 md:px-3 md:py-2 min-h-11 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base md:text-sm"
               >
                 <option value="">Todas as categorias</option>
                 <option value="Residencial">Residencial</option>
@@ -177,7 +185,8 @@ export const Catalogo: React.FC = () => {
               <select
                 value={filtros.tipo || ''}
                 onChange={(e) => setFiltros({ ...filtros, tipo: e.target.value })}
-                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                aria-label="Tipo"
+                className="px-4 py-3 md:px-3 md:py-2 min-h-11 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base md:text-sm"
               >
                 <option value="">Todos os tipos</option>
                 {tiposUnicos.map(tipo => (
@@ -188,7 +197,8 @@ export const Catalogo: React.FC = () => {
               <select
                 value={filtros.bairro || ''}
                 onChange={(e) => setFiltros({ ...filtros, bairro: e.target.value })}
-                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                aria-label="Bairro"
+                className="px-4 py-3 md:px-3 md:py-2 min-h-11 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base md:text-sm"
               >
                 <option value="">Todos os bairros</option>
                 {bairrosUnicos.map(bairro => (
@@ -199,7 +209,8 @@ export const Catalogo: React.FC = () => {
               <select
                 value={filtros.cidade || ''}
                 onChange={(e) => setFiltros({ ...filtros, cidade: e.target.value })}
-                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                aria-label="Cidade"
+                className="px-4 py-3 md:px-3 md:py-2 min-h-11 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base md:text-sm"
               >
                 <option value="">Todas as cidades</option>
                 {cidadesUnicas.map(cidade => (
@@ -210,8 +221,9 @@ export const Catalogo: React.FC = () => {
               <select
                 value={sortImoveisAtual}
                 onChange={(e) => void definirOrdenacaoImoveis(e.target.value as any)}
-                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                className="px-4 py-3 md:px-3 md:py-2 min-h-11 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base md:text-sm"
                 title="Ordenar resultados"
+                aria-label="Ordenar resultados"
               >
                 <option value="data-desc">Mais recentes</option>
                 <option value="data-asc">Mais antigos</option>
@@ -220,8 +232,9 @@ export const Catalogo: React.FC = () => {
               </select>
 
               <button
+                type="button"
                 onClick={() => setFiltros({})}
-                className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium"
+                className="px-4 py-3 md:px-4 md:py-2 min-h-11 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors text-base md:text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
               >
                 Limpar Filtros
               </button>
@@ -245,19 +258,42 @@ export const Catalogo: React.FC = () => {
             </div>
           )}
           <button
+            type="button"
             onClick={() => setMostrarApenasFavoritos(!mostrarApensFavoritos)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
               mostrarApensFavoritos
                 ? 'bg-red-500 text-white hover:bg-red-600'
                 : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
-            }`}
+            } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2`}
+            aria-pressed={mostrarApensFavoritos}
           >
             <Heart size={20} fill={mostrarApensFavoritos ? 'currentColor' : 'none'} />
             {mostrarApensFavoritos ? `Meus Favoritos (${favoritos.length})` : `Ver Favoritos (${favoritos.length})`}
           </button>
         </div>
 
-        {imoveisFiltrados.length === 0 ? (
+        {carregandoImoveis && imoveis.length === 0 && !mostrarApensFavoritos ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {Array.from({ length: 8 }).map((_, idx) => (
+              <div key={idx} className="bg-white rounded-lg overflow-hidden shadow-lg">
+                <Skeleton className="h-48 w-full" />
+                <div className="p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <Skeleton className="h-5 w-16 rounded" />
+                    <Skeleton className="h-7 w-24 rounded" />
+                  </div>
+                  <Skeleton className="h-5 w-5/6 rounded" />
+                  <Skeleton className="h-4 w-4/6 rounded" />
+                  <div className="pt-3 border-t border-slate-200 flex gap-3">
+                    <Skeleton className="h-4 w-10 rounded" />
+                    <Skeleton className="h-4 w-10 rounded" />
+                    <Skeleton className="h-4 w-10 rounded" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : imoveisFiltrados.length === 0 ? (
           <div className="text-center py-16">
             <Search size={64} className="mx-auto text-slate-300 mb-4" />
             <h3 className="text-xl font-semibold text-slate-600 mb-2">
@@ -343,8 +379,10 @@ const ImovelCard: React.FC<ImovelCardProps> = ({ imovel }) => {
         </div>
         <button
           onClick={handleFavoritar}
-          className="absolute top-3 left-3 bg-white/90 hover:bg-white p-2 rounded-full shadow-lg transition-all hover:scale-110"
+          className="absolute top-3 left-3 bg-white/90 hover:bg-white p-2 rounded-full shadow-lg transition-all hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
           title={favorito ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+          aria-label={favorito ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+          aria-pressed={favorito}
         >
           <Heart
             size={20}

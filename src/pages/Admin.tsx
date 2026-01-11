@@ -3,9 +3,10 @@ import { useImoveis } from '../contexts/ImoveisContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { Building2, Users, Home, Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
 import { obterFotoDestaque, formatarMoeda, otimizarUrlCloudinary } from '../utils/helpers';
+import { Skeleton } from '../components/Skeleton';
 
 export const Admin: React.FC = () => {
-  const { imoveis, removerImovel, atualizarImovel, leadsNaoVisualizados } = useImoveis();
+  const { imoveis, removerImovel, atualizarImovel, leadsNaoVisualizados, carregandoImoveis } = useImoveis();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -41,12 +42,12 @@ export const Admin: React.FC = () => {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
               <Building2 size={32} className="text-gold-400" />
-              <h1 className="text-3xl font-bold">Gerenciamento de Imóveis</h1>
+              <h1 className="text-3xl font-bold font-display">Gerenciamento de Imóveis</h1>
             </div>
             <div className="flex gap-4 items-center">
               <Link
                 to="/admin/leads"
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors flex items-center gap-2 relative"
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors flex items-center gap-2 relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
               >
                 <Users size={20} />
                 Leads
@@ -58,14 +59,14 @@ export const Admin: React.FC = () => {
               </Link>
               <Link
                 to="/"
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
               >
                 <Home size={20} />
                 Ver Catálogo
               </Link>
               <button
                 onClick={handleLogout}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors text-white font-semibold ml-2"
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors text-white font-semibold ml-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
                 title="Encerrar sessão"
               >
                 Encerrar Sessão
@@ -89,7 +90,36 @@ export const Admin: React.FC = () => {
           </Link>
         </div>
 
-        {imoveis.length === 0 ? (
+        {carregandoImoveis && imoveis.length === 0 ? (
+          <div className="grid grid-cols-1 gap-4">
+            {Array.from({ length: 6 }).map((_, idx) => (
+              <div key={idx} className="bg-white rounded-lg shadow-lg overflow-hidden">
+                <div className="flex flex-col md:flex-row">
+                  <Skeleton className="md:w-64 h-48 md:h-auto" />
+                  <div className="flex-1 p-6 space-y-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-5 w-44 rounded" />
+                        <Skeleton className="h-6 w-3/4 rounded" />
+                      </div>
+                      <div className="text-right space-y-2">
+                        <Skeleton className="h-4 w-24 rounded" />
+                        <Skeleton className="h-7 w-32 rounded" />
+                      </div>
+                    </div>
+                    <Skeleton className="h-4 w-full rounded" />
+                    <Skeleton className="h-4 w-5/6 rounded" />
+                    <div className="pt-2 flex gap-2">
+                      <Skeleton className="h-10 w-28 rounded-lg" />
+                      <Skeleton className="h-10 w-24 rounded-lg" />
+                      <Skeleton className="h-10 w-28 rounded-lg" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : imoveis.length === 0 ? (
           <div className="bg-white rounded-lg shadow-lg p-12 text-center">
             <Building2 size={64} className="mx-auto text-slate-300 mb-4" />
             <h3 className="text-xl font-semibold text-slate-600 mb-2">
@@ -100,7 +130,7 @@ export const Admin: React.FC = () => {
             </p>
             <Link
               to="/admin/imovel/novo"
-              className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
             >
               <Plus size={20} />
               Cadastrar Imóvel
