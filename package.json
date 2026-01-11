@@ -17,6 +17,7 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "server": "node server/index.js",
     "start": "node dist-server/index.js",
+    "migrate:photos": "tsx scripts/migrate-photos-to-cloudinary.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
