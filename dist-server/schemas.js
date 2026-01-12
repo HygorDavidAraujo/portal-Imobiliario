@@ -176,12 +176,13 @@ export const validateAndFormat = (schema, data) => {
     }
     catch (error) {
         if (error instanceof z.ZodError) {
-            const zodError = error;
-            const errors = zodError.errors.map((err) => {
-                const path = err.path.join('.');
-                return `${path}: ${err.message}`;
+            // Zod v3 expõe `errors`, Zod v4 expõe `issues`. Suporta ambos.
+            const issues = error.issues ?? error.errors ?? [];
+            const formatted = issues.map((issue) => {
+                const path = Array.isArray(issue.path) ? issue.path.join('.') : '';
+                return path ? `${path}: ${issue.message}` : issue.message;
             });
-            return { success: false, errors };
+            return { success: false, errors: formatted.length ? formatted : ['Dados inválidos'] };
         }
         return { success: false, errors: ['Erro desconhecido ao validar dados'] };
     }

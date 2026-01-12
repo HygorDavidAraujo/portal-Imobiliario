@@ -193,12 +193,13 @@ export const validateAndFormat = <T,>(schema: z.ZodSchema<T>, data: unknown): { 
     return { success: true, data: validated };
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const zodError = error as any;
-      const errors = zodError.errors.map((err: z.ZodIssue) => {
-        const path = err.path.join('.');
-        return `${path}: ${err.message}`;
+      // Zod v3 expõe `errors`, Zod v4 expõe `issues`. Suporta ambos.
+      const issues: z.ZodIssue[] = (error as any).issues ?? (error as any).errors ?? [];
+      const formatted = issues.map((issue) => {
+        const path = Array.isArray(issue.path) ? issue.path.join('.') : '';
+        return path ? `${path}: ${issue.message}` : issue.message;
       });
-      return { success: false, errors };
+      return { success: false, errors: formatted.length ? formatted : ['Dados inválidos'] };
     }
     return { success: false, errors: ['Erro desconhecido ao validar dados'] };
   }
