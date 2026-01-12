@@ -7,8 +7,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Manrope', 'Inter', 'system-ui', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
-        display: ['Space Grotesk', 'Manrope', 'Inter', 'system-ui', 'sans-serif'],
+        sans: ['Roboto', 'system-ui', '-apple-system', 'Segoe UI', 'Helvetica', 'Arial', 'sans-serif'],
+        display: ['Lato', 'Roboto', 'system-ui', 'sans-serif'],
       },
       colors: {
         brand: {

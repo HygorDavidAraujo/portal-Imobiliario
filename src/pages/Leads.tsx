@@ -267,7 +267,7 @@ export const Leads: React.FC = () => {
                         <p className="font-semibold text-slate-800">{lead.imovelTitulo || '(imóvel não encontrado)'}</p>
                         {imovel && (
                           <p className="text-sm text-blue-600 mt-1">
-                            {formatarMoeda(imovel.preco)}
+                            <span className="font-display">{formatarMoeda(imovel.preco)}</span>
                           </p>
                         )}
                       </div>

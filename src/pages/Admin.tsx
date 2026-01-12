@@ -164,7 +164,7 @@ export const Admin: React.FC = () => {
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="inline-block bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-mono font-semibold">
+                          <span className="inline-block bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-display font-semibold">
                             #{imovel.id}
                           </span>
                           <span className={`inline-block ${imovel.ativo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} px-3 py-1 rounded-full text-xs font-semibold`}>
@@ -178,7 +178,7 @@ export const Admin: React.FC = () => {
                       </div>
                       <div className="text-right">
                         <div className="text-sm text-slate-600">{imovel.tipologia.tipoVenda}</div>
-                        <div className="text-2xl font-bold text-blue-600">
+                        <div className="text-2xl font-bold text-blue-600 font-display">
                           {formatarMoeda(imovel.preco)}
                         </div>
                       </div>

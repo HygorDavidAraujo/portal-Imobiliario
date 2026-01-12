@@ -284,7 +284,7 @@ export const DetalhesImovel: React.FC = () => {
                 </div>
                 <div className="text-right">
                   <div className="text-sm text-slate-600 mb-1">{imovel.tipologia.tipoVenda}</div>
-                  <div className="text-3xl font-bold text-blue-600">
+                  <div className="text-3xl font-bold text-blue-600 font-display">
                     {formatarMoeda(imovel.preco)}
                   </div>
                 </div>
@@ -389,13 +389,13 @@ export const DetalhesImovel: React.FC = () => {
                 {(imovel.tipo === 'Lote' || imovel.tipo === 'Lote em Condomínio') && imovel.fichaTecnica.valorItu && (
                   <div className="flex justify-between py-2 border-b border-slate-200">
                     <span className="text-slate-600">ITU (Anual):</span>
-                    <span className="font-semibold text-slate-800">{formatarMoeda(imovel.fichaTecnica.valorItu)}</span>
+                    <span className="font-semibold text-slate-800 font-display">{formatarMoeda(imovel.fichaTecnica.valorItu)}</span>
                   </div>
                 )}
                 {imovel.tipo !== 'Lote' && imovel.tipo !== 'Lote em Condomínio' && imovel.fichaTecnica.valorIptu && (
                   <div className="flex justify-between py-2 border-b border-slate-200">
                     <span className="text-slate-600">IPTU (Anual):</span>
-                    <span className="font-semibold text-slate-800">{formatarMoeda(imovel.fichaTecnica.valorIptu)}</span>
+                    <span className="font-semibold text-slate-800 font-display">{formatarMoeda(imovel.fichaTecnica.valorIptu)}</span>
                   </div>
                 )}
               </div>
@@ -457,7 +457,7 @@ export const DetalhesImovel: React.FC = () => {
                     {imovel.dadosRural.areaAlqueires && (
                       <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
                         <div className="text-sm text-slate-600 mb-1">Tamanho da Propriedade</div>
-                        <div className="text-2xl font-bold text-green-600">
+                        <div className="text-2xl font-bold text-green-600 font-display">
                           {imovel.dadosRural.areaAlqueires.toFixed(2)} alqueire{imovel.dadosRural.areaAlqueires !== 1 ? 's' : ''}
                         </div>
                         {imovel.dadosRural.tipoAlqueire && (
@@ -470,7 +470,7 @@ export const DetalhesImovel: React.FC = () => {
                     {imovel.dadosRural.valorItr && (
                       <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                         <div className="text-sm text-slate-600 mb-1">ITR (Anual)</div>
-                        <div className="text-xl font-bold text-blue-600">
+                        <div className="text-xl font-bold text-blue-600 font-display">
                           {formatarMoeda(imovel.dadosRural.valorItr)}
                         </div>
                       </div>
@@ -532,7 +532,7 @@ export const DetalhesImovel: React.FC = () => {
                 {imovel.dadosCondominio.valorCondominio && (
                   <div className="mb-4 p-3 bg-blue-50 rounded-lg">
                     <span className="text-slate-600">Valor do Condomínio: </span>
-                    <span className="font-bold text-blue-600 text-lg">
+                    <span className="font-bold text-blue-600 text-lg font-display">
                       {formatarMoeda(imovel.dadosCondominio.valorCondominio)}
                     </span>
                   </div>

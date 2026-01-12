@@ -94,7 +94,7 @@ export const Catalogo: React.FC = () => {
                 className="w-16 h-16 rounded-lg shadow-lg object-contain"
               />
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-gold-300 to-gold-500 bg-clip-text text-transparent">
+                <h1 className="text-2xl font-bold font-display bg-gradient-to-r from-gold-300 to-gold-500 bg-clip-text text-transparent">
                   Hygor Araújo
                 </h1>
                 <p className="text-sm text-slate-300">Corretor de Imóveis</p>
@@ -396,16 +396,16 @@ const ImovelCard: React.FC<ImovelCardProps> = ({ imovel }) => {
       <div className="p-4 flex flex-col flex-grow">
         {/* ID e Preço */}
         <div className="mb-2 flex items-baseline justify-between gap-2">
-          <span className="text-xs font-mono font-semibold text-slate-500 bg-slate-100 px-2 py-1 rounded">
+          <span className="text-xs font-display font-semibold text-slate-500 bg-slate-100 px-2 py-1 rounded">
             #{imovel.id}
           </span>
-          <span className="text-2xl font-bold text-blue-600">
+          <span className="text-2xl font-bold text-blue-600 font-display">
             {formatarMoeda(imovel.preco)}
           </span>
         </div>
 
         {/* Título */}
-        <h3 className="text-lg font-semibold text-slate-800 mb-2 line-clamp-2 min-h-[3.5rem]">
+        <h3 className="text-lg font-semibold text-slate-800 mb-2 line-clamp-2 min-h-[3.5rem] font-display">
           {imovel.titulo}
         </h3>
 
