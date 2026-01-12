@@ -187,7 +187,7 @@ export const DetalhesImovel: React.FC = () => {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8 pb-28 lg:pb-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Coluna Principal */}
           <div className="lg:col-span-2 space-y-6">
@@ -708,6 +708,38 @@ export const DetalhesImovel: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Ações flutuantes no mobile */}
+      {!mostrarFormulario && (
+        <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-3 lg:hidden">
+          <button
+            type="button"
+            onClick={handleFavoritar}
+            className={`inline-flex items-center justify-center gap-2 px-4 py-3 rounded-full shadow-xl transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
+              favorito
+                ? 'bg-red-500 text-white hover:bg-red-600'
+                : 'bg-white text-slate-800 border border-slate-200 hover:bg-slate-50'
+            }`}
+            aria-pressed={favorito}
+            aria-label={favorito ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+          >
+            <Heart size={20} fill={favorito ? 'currentColor' : 'none'} />
+            <span className="text-sm font-semibold">
+              {favorito ? 'Favorito' : 'Favoritar'}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleInteresse}
+            className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-full shadow-xl bg-blue-600 text-white hover:bg-blue-700 transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            aria-label="Me interessei"
+          >
+            <MessageCircle size={20} />
+            <span className="text-sm font-semibold">Me interessei</span>
+          </button>
+        </div>
+      )}
 
       {/* Modal de Contato */}
       {mostrarFormulario && (
