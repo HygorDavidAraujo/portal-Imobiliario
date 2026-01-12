@@ -229,61 +229,113 @@ export const GerenciamentoImoveis: React.FC = () => {
   };
 
   const [uploadingImages, setUploadingImages] = React.useState(false);
+  const [pendingUploads, setPendingUploads] = React.useState<Array<{ localId: string; file: File; previewUrl: string }>>([]);
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+
+  const pendingUploadsRef = React.useRef(pendingUploads);
+  React.useEffect(() => {
+    pendingUploadsRef.current = pendingUploads;
+  }, [pendingUploads]);
+
+  React.useEffect(() => {
+    return () => {
+      // Revoga URLs blob no unmount
+      for (const item of pendingUploadsRef.current) {
+        try {
+          URL.revokeObjectURL(item.previewUrl);
+        } catch {
+          // ignore
+        }
+      }
+    };
+  }, []);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
-    
-    setUploadingImages(true);
+
     const files = Array.from(e.target.files);
     const token = localStorage.getItem('adminToken');
     
     if (!token) {
-      setErros(['Você precisa estar autenticado para fazer upload de imagens']);
-      setUploadingImages(false);
+      setErros(['Você precisa estar autenticado para enviar imagens']);
       return;
     }
     
     try {
-      const novasFotos: Foto[] = [];
-      
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const formData = new FormData();
-        formData.append('image', file);
-        formData.append('imovelId', id || 'novo');
-        
-        const response = await fetch(`${apiBaseUrl}/api/upload-image`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          body: formData,
-        });
-        
-        if (!response.ok) {
-          throw new Error('Erro ao fazer upload da imagem');
+      // Se estiver editando (já tem ID), pode enviar direto ao Cloudinary.
+      // Se for cadastro novo, só gera preview local e envia no submit.
+      if (id) {
+        setUploadingImages(true);
+        const novasFotos: Foto[] = [];
+
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const formData = new FormData();
+          formData.append('image', file);
+          formData.append('imovelId', id);
+
+          const response = await fetch(`${apiBaseUrl}/api/upload-image`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+            body: formData,
+          });
+
+          if (!response.ok) {
+            throw new Error('Erro ao fazer upload da imagem');
+          }
+
+          const data = await response.json();
+          novasFotos.push({
+            id: data.publicId,
+            url: data.url,
+            isDestaque: fotos.length === 0 && i === 0,
+          });
         }
-        
-        const data = await response.json();
-        novasFotos.push({
-          id: data.publicId,
-          url: data.url,
-          isDestaque: fotos.length === 0 && i === 0,
-        });
+
+        setFotos((prev) => [...prev, ...novasFotos]);
+      } else {
+        const novasPendencias: Array<{ localId: string; file: File; previewUrl: string }> = [];
+        const novasFotos: Foto[] = [];
+
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const localId = `local-${(crypto as any).randomUUID?.() ?? (Date.now().toString(36) + Math.random().toString(36).slice(2))}`;
+          const previewUrl = URL.createObjectURL(file);
+          novasPendencias.push({ localId, file, previewUrl });
+          novasFotos.push({
+            id: localId,
+            url: previewUrl,
+            isDestaque: fotos.length === 0 && i === 0,
+          });
+        }
+
+        setPendingUploads((prev) => [...prev, ...novasPendencias]);
+        setFotos((prev) => [...prev, ...novasFotos]);
       }
-      
-      setFotos(prev => [...prev, ...novasFotos]);
     } catch (error) {
       console.error('Erro ao fazer upload:', error);
       setErros(['Erro ao fazer upload das imagens. Tente novamente.']);
     } finally {
       setUploadingImages(false);
+      // Permite selecionar o mesmo arquivo novamente
+      e.target.value = '';
     }
   };
 
   const removerFoto = (id: string) => {
-    setFotos(prev => prev.filter(f => f.id !== id));
+    // Se for uma foto local (pré-upload), remove também da lista de pendências e revoga o preview.
+    const pending = pendingUploads.find((p) => p.localId === id);
+    if (pending) {
+      try {
+        URL.revokeObjectURL(pending.previewUrl);
+      } catch {
+        // ignore
+      }
+      setPendingUploads((prev) => prev.filter((p) => p.localId !== id));
+    }
+    setFotos((prev) => prev.filter((f) => f.id !== id));
   };
 
   const marcarComoDestaque = (id: string) => {
@@ -439,13 +491,92 @@ export const GerenciamentoImoveis: React.FC = () => {
       if (id) {
         await atualizarImovel(id, imovelFinal);
       } else {
-        await adicionarImovel(imovelFinal);
+        const token = localStorage.getItem('adminToken');
+        if (!token) {
+          setErros(['Você precisa estar autenticado para cadastrar imóvel']);
+          window.scrollTo(0, 0);
+          return;
+        }
+
+        setUploadingImages(true);
+
+        // 1) Buscar um ID para poder enviar as fotos para a pasta correta
+        const reserveResponse = await fetch(
+          `${apiBaseUrl}/api/imoveis/next-id?tipo=${encodeURIComponent(tipo)}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!reserveResponse.ok) {
+          throw new Error('Erro ao gerar ID do imóvel');
+        }
+
+        const reserveData = await reserveResponse.json();
+        const novoId = String(reserveData?.id || '').trim();
+        if (!novoId) {
+          throw new Error('Servidor não retornou um ID válido');
+        }
+
+        // 2) Upload das fotos locais (na ordem exibida)
+        const pendingMap = new Map(pendingUploads.map((p) => [p.localId, p] as const));
+        const localFotosInOrder = fotos.filter((f) => pendingMap.has(f.id));
+        const destaqueId = fotos.find((f) => f.isDestaque)?.id;
+
+        const fotosEnviadas: Foto[] = [];
+        for (let i = 0; i < localFotosInOrder.length; i++) {
+          const fotoLocal = localFotosInOrder[i];
+          const pending = pendingMap.get(fotoLocal.id);
+          if (!pending) continue;
+
+          const formData = new FormData();
+          formData.append('image', pending.file);
+          formData.append('imovelId', novoId);
+
+          const uploadResponse = await fetch(`${apiBaseUrl}/api/upload-image`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+            body: formData,
+          });
+
+          if (!uploadResponse.ok) {
+            const detail = await uploadResponse.text().catch(() => '');
+            throw new Error(detail || 'Erro ao fazer upload da imagem');
+          }
+
+          const data = await uploadResponse.json();
+          fotosEnviadas.push({
+            id: data.publicId,
+            url: data.url,
+            isDestaque: destaqueId ? fotoLocal.id === destaqueId : i === 0,
+          });
+        }
+
+        // Garante que exista uma foto destaque
+        if (fotosEnviadas.length > 0 && !fotosEnviadas.some((f) => f.isDestaque)) {
+          fotosEnviadas[0].isDestaque = true;
+        }
+
+        // 3) Salvar o imóvel já com fotos e com ID definido
+        const imovelFinalComId: Imovel = {
+          ...imovelFinal,
+          id: novoId,
+          fotos: fotosEnviadas,
+        };
+
+        await adicionarImovel(imovelFinalComId);
       }
       navigate('/admin');
     } catch (error) {
       console.error('Erro ao salvar imóvel:', error);
       setErros(['Erro ao salvar imóvel. Tente novamente.']);
       window.scrollTo(0, 0);
+    } finally {
+      setUploadingImages(false);
     }
   };
 
@@ -1614,10 +1745,13 @@ export const GerenciamentoImoveis: React.FC = () => {
             </button>
             <button
               type="submit"
-              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all flex items-center gap-2 shadow-lg hover:shadow-xl"
+              disabled={uploadingImages}
+              className={`px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg transition-all flex items-center gap-2 shadow-lg hover:shadow-xl ${
+                uploadingImages ? 'opacity-70 cursor-wait' : 'hover:from-blue-700 hover:to-blue-800'
+              }`}
             >
               <Save size={20} />
-              {id ? 'Atualizar Imóvel' : 'Cadastrar Imóvel'}
+              {uploadingImages ? 'Salvando...' : (id ? 'Atualizar Imóvel' : 'Cadastrar Imóvel')}
             </button>
           </div>
         </form>

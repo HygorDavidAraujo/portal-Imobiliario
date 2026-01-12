@@ -259,6 +259,14 @@ MAIL_USER=seu-email@gmail.com
 MAIL_PASS=sua-senha-de-app
 MAIL_TO=destinatario@gmail.com
 
+# Cloudinary (upload de fotos)
+# Recomendado: use CLOUDINARY_URL (uma única variável)
+# Alternativa: use as 3 variáveis separadas
+CLOUDINARY_URL=cloudinary://API_KEY:API_SECRET@CLOUD_NAME
+# CLOUDINARY_CLOUD_NAME=...
+# CLOUDINARY_API_KEY=...
+# CLOUDINARY_API_SECRET=...
+
 # Server
 PORT=4000
 NODE_ENV=production

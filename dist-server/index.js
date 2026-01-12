@@ -14,11 +14,21 @@ const gerarId = () => {
 const JWT_SECRET = process.env.JWT_SECRET || 'portal-imobiliario-secret-key-change-in-production';
 const JWT_EXPIRATION = '24h';
 // ==================== CONFIGURAÇÃO CLOUDINARY ====================
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+// Suporta tanto as variáveis separadas quanto CLOUDINARY_URL.
+// - Produção (Railway/Vercel): configure via painel de variáveis.
+// - Local: pode usar .env
+if (process.env.CLOUDINARY_URL) {
+    // O SDK lê CLOUDINARY_URL do ambiente; só garantimos HTTPS.
+    cloudinary.config({ secure: true });
+}
+else {
+    cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
+        secure: true,
+    });
+}
 // Configuração do Multer para upload em memória
 const upload = multer({
     storage: multer.memoryStorage(),
@@ -515,17 +525,20 @@ app.get('/', (_req, res) => {
 // ==================== UPLOAD DE IMAGENS ====================
 app.post('/api/upload-image', authenticateAdmin, upload.single('image'), async (req, res) => {
     try {
+        const hasCloudinaryUrl = Boolean(process.env.CLOUDINARY_URL);
         const hasCloudName = Boolean(process.env.CLOUDINARY_CLOUD_NAME);
         const hasApiKey = Boolean(process.env.CLOUDINARY_API_KEY);
         const hasApiSecret = Boolean(process.env.CLOUDINARY_API_SECRET);
-        if (!hasCloudName || !hasApiKey || !hasApiSecret) {
+        const hasCloudinaryParts = hasCloudName && hasApiKey && hasApiSecret;
+        if (!hasCloudinaryUrl && !hasCloudinaryParts) {
             console.error('[UPLOAD] Cloudinary não configurado', {
+                CLOUDINARY_URL: hasCloudinaryUrl,
                 CLOUDINARY_CLOUD_NAME: hasCloudName,
                 CLOUDINARY_API_KEY: hasApiKey,
                 CLOUDINARY_API_SECRET: hasApiSecret,
             });
             return res.status(500).json({
-                error: 'Cloudinary não configurado no servidor. Defina CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY e CLOUDINARY_API_SECRET.',
+                error: 'Cloudinary não configurado no servidor. Defina CLOUDINARY_URL (recomendado) ou CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY e CLOUDINARY_API_SECRET.',
             });
         }
         if (!req.file) {
@@ -793,6 +806,24 @@ app.get('/api/imoveis/:id', async (req, res) => {
         res.status(500).json({ error: 'Erro ao buscar imóvel' });
     }
 });
+// Gera um ID novo (pré-cadastro) para permitir upload de fotos na pasta correta.
+// Observação: não “reserva” o ID globalmente; em cenários com múltiplos admins simultâneos,
+// o ID pode colidir. O POST /api/imoveis ainda valida e falha com 409 se já existir.
+app.get('/api/imoveis/next-id', authenticateAdmin, async (req, res) => {
+    try {
+        const tipo = String(req.query.tipo || '').trim();
+        if (!tipo) {
+            return res.status(400).json({ error: 'Parâmetro tipo é obrigatório' });
+        }
+        const id = await gerarProximoId(tipo);
+        return res.json({ id });
+    }
+    catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        console.error('Erro ao gerar next-id:', error);
+        return res.status(500).json({ error: 'Erro ao gerar ID do imóvel', detail });
+    }
+});
 app.post('/api/imoveis', authenticateAdmin, async (req, res) => {
     try {
         const imovel = req.body;
@@ -805,8 +836,31 @@ app.post('/api/imoveis', authenticateAdmin, async (req, res) => {
             });
         }
         const validatedImovel = validation.data;
-        const novoId = await gerarProximoId(validatedImovel.tipo);
-        console.log(`📝 Gerando novo imóvel: ${novoId} (${validatedImovel.tipo})`);
+        const prefixoEsperado = obterPrefixoTipo(validatedImovel.tipo);
+        const requestedId = typeof validatedImovel.id === 'string' ? validatedImovel.id.trim() : '';
+        let novoId = '';
+        if (requestedId) {
+            const suffix = requestedId.slice(prefixoEsperado.length);
+            const prefixOk = requestedId.startsWith(prefixoEsperado);
+            const suffixOk = suffix.length >= 3 && /^[0-9]+$/.test(suffix);
+            if (!prefixOk || !suffixOk) {
+                return res.status(400).json({
+                    error: `ID inválido para o tipo informado. Esperado prefixo ${prefixoEsperado} e sufixo numérico (ex: ${prefixoEsperado}001).`,
+                });
+            }
+            if (!db.prisma)
+                throw new Error('Prisma client não está disponível. Verifique a configuração do banco de dados.');
+            const exists = await db.prisma.imovel.findUnique({ where: { id: requestedId }, select: { id: true } });
+            if (exists) {
+                return res.status(409).json({ error: `ID já existe: ${requestedId}` });
+            }
+            novoId = requestedId;
+            console.log(`📝 Criando imóvel com ID fornecido: ${novoId} (${validatedImovel.tipo})`);
+        }
+        else {
+            novoId = await gerarProximoId(validatedImovel.tipo);
+            console.log(`📝 Gerando novo imóvel: ${novoId} (${validatedImovel.tipo})`);
+        }
         const { endereco = {}, fichaTecnica = {}, dadosApartamento = {}, dadosLoteCondominio = {}, dadosCondominio = {}, dadosRural = {}, tipologia = {}, proprietario = {}, fotos = [], } = validatedImovel;
         const dataToCreate = {
             id: novoId,
