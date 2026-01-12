@@ -155,7 +155,8 @@ export const imovelSchema = z.object({
   proprietario: proprietarioSchema.optional(),
   fotos: z.array(fotoSchema).min(4, 'Mínimo de 4 fotos é obrigatório'),
   ativo: z.boolean().default(true),
-  dataCadastro: z.date().optional(),
+  // Recebe Date real (server-side) ou ISO string (JSON do frontend)
+  dataCadastro: z.coerce.date().optional(),
 });
 
 // Schema para lead
@@ -168,7 +169,7 @@ export const leadSchema = z.object({
     telefone: z.string().regex(/^\(\d{2}\)\s\d{4,5}-\d{4}$|^\d{10,11}$/, 'Telefone inválido'),
     email: z.string().email('E-mail inválido'),
   }),
-  data: z.date().optional(),
+  data: z.coerce.date().optional(),
   visualizado: z.boolean().default(false),
 });
 

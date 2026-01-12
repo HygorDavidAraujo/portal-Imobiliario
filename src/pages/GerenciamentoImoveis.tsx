@@ -348,8 +348,15 @@ export const GerenciamentoImoveis: React.FC = () => {
   const validarFormulario = (): boolean => {
     const novosErros: string[] = [];
 
+    if (!tipo.trim()) novosErros.push('Tipo é obrigatório');
     if (!titulo.trim()) novosErros.push('Título é obrigatório');
     if (!descricao.trim()) novosErros.push('Descrição é obrigatória');
+
+    // Endereço (o backend exige bairro/cidade/estado)
+    if (!bairro.trim()) novosErros.push('Bairro é obrigatório');
+    if (!cidade.trim()) novosErros.push('Cidade é obrigatória');
+    if (!estado.trim() || estado.trim().length !== 2) novosErros.push('Estado deve ter 2 caracteres (UF)');
+
     const precoNumerico = converterValorBrasileiroParaNumero(preco);
     if (Number.isNaN(precoNumerico) || precoNumerico <= 0) novosErros.push('Preço deve ser maior que zero');
     
@@ -573,7 +580,11 @@ export const GerenciamentoImoveis: React.FC = () => {
       navigate('/admin');
     } catch (error) {
       console.error('Erro ao salvar imóvel:', error);
-      setErros(['Erro ao salvar imóvel. Tente novamente.']);
+      const message = error instanceof Error ? error.message : String(error);
+      const mensagens = message
+        ? message.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)
+        : ['Erro ao salvar imóvel. Tente novamente.'];
+      setErros(mensagens.length ? mensagens : ['Erro ao salvar imóvel. Tente novamente.']);
       window.scrollTo(0, 0);
     } finally {
       setUploadingImages(false);
