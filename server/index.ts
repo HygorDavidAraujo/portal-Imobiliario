@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
-import multer from 'multer';
+import multer, { MulterError } from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
 import { imovelSchema, leadSchema, sendLeadEmailSchema, validateAndFormat } from './schemas.js';
 
@@ -562,6 +562,20 @@ app.get('/', (_req: Request, res: Response) => {
 
 app.post('/api/upload-image', authenticateAdmin, upload.single('image'), async (req: AuthRequest, res: Response) => {
   try {
+    const hasCloudName = Boolean(process.env.CLOUDINARY_CLOUD_NAME);
+    const hasApiKey = Boolean(process.env.CLOUDINARY_API_KEY);
+    const hasApiSecret = Boolean(process.env.CLOUDINARY_API_SECRET);
+    if (!hasCloudName || !hasApiKey || !hasApiSecret) {
+      console.error('[UPLOAD] Cloudinary não configurado', {
+        CLOUDINARY_CLOUD_NAME: hasCloudName,
+        CLOUDINARY_API_KEY: hasApiKey,
+        CLOUDINARY_API_SECRET: hasApiSecret,
+      });
+      return res.status(500).json({
+        error: 'Cloudinary não configurado no servidor. Defina CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY e CLOUDINARY_API_SECRET.',
+      });
+    }
+
     if (!req.file) {
       return res.status(400).json({ error: 'Nenhuma imagem fornecida' });
     }
@@ -593,8 +607,9 @@ app.post('/api/upload-image', authenticateAdmin, upload.single('image'), async (
       publicId: result.public_id,
     });
   } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
     console.error('Erro ao fazer upload:', error);
-    res.status(500).json({ error: 'Erro ao fazer upload da imagem' });
+    res.status(500).json({ error: 'Erro ao fazer upload da imagem', detail });
   }
 });
 
@@ -1312,6 +1327,17 @@ app.post('/api/send-lead', async (req: Request, res: Response) => {
 
 // Middleware de tratamento de erros centralizado
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  if (err instanceof MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'Imagem excede o limite de 5MB.' });
+    }
+    return res.status(400).json({ error: `Erro no upload: ${err.message}` });
+  }
+
+  if (err instanceof Error && err.message === 'Apenas imagens são permitidas') {
+    return res.status(400).json({ error: err.message });
+  }
+
   console.error('❌ Erro NÃO TRATADO:', err.stack || err);
 
   // Não vazar detalhes do erro em produção
