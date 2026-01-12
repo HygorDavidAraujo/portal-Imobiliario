@@ -660,7 +660,7 @@ export const DetalhesImovel: React.FC = () => {
 
           {/* Sidebar - Contato */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-lg p-6 lg:sticky lg:top-24">
+            <div className="bg-white rounded-lg shadow-lg p-6">
               <h3 className="text-xl font-semibold text-slate-800 mb-4">Interessado?</h3>
               <p className="text-slate-600 mb-6">
                 Entre em contato e agende uma visita!
