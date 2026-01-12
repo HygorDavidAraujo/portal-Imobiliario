@@ -104,17 +104,17 @@ export const Catalogo: React.FC = () => {
 
             {/* Contatos */}
             <div className="flex flex-col md:items-end gap-2">
-              <div className="flex items-center gap-4 text-sm">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-x-4 gap-y-2 text-sm">
                 <a
                   href="tel:5562981831483"
-                  className="flex items-center gap-2 hover:text-gold-400 transition-colors"
+                  className="flex items-center gap-2 hover:text-gold-400 transition-colors max-w-full"
                 >
                   <Phone size={16} />
                   (62) 98183-1483
                 </a>
                 <a
                   href="mailto:hygordavidaraujo@gmail.com"
-                  className="flex items-center gap-2 hover:text-gold-400 transition-colors"
+                  className="flex items-center gap-2 hover:text-gold-400 transition-colors max-w-full break-all"
                 >
                   <Mail size={16} />
                   hygordavidaraujo@gmail.com
@@ -264,7 +264,7 @@ export const Catalogo: React.FC = () => {
               mostrarApensFavoritos
                 ? 'bg-red-500 text-white hover:bg-red-600'
                 : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
-            } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2`}
+            } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 max-w-full whitespace-normal break-words`}
             aria-pressed={mostrarApensFavoritos}
           >
             <Heart size={20} fill={mostrarApensFavoritos ? 'currentColor' : 'none'} />
@@ -395,22 +395,22 @@ const ImovelCard: React.FC<ImovelCardProps> = ({ imovel }) => {
       {/* Conteúdo */}
       <div className="p-4 flex flex-col flex-grow">
         {/* ID e Preço */}
-        <div className="mb-2 flex items-baseline justify-between gap-2">
+        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2 min-w-0">
           <span className="text-xs font-display font-semibold text-slate-500 bg-slate-100 px-2 py-1 rounded">
             #{imovel.id}
           </span>
-          <span className="text-2xl font-bold text-blue-600 font-display">
+          <span className="text-2xl font-bold text-blue-600 font-display text-right leading-tight break-words">
             {formatarMoeda(imovel.preco)}
           </span>
         </div>
 
         {/* Título */}
-        <h3 className="text-lg font-semibold text-slate-800 mb-2 line-clamp-2 min-h-[3.5rem] font-display">
+        <h3 className="text-lg font-semibold text-slate-800 mb-2 line-clamp-2 min-h-[3.5rem] font-display break-words">
           {imovel.titulo}
         </h3>
 
         {/* Localização */}
-        <div className="flex items-center gap-2 text-slate-600 mb-3 text-sm">
+        <div className="flex items-center gap-2 text-slate-600 mb-3 text-sm min-w-0">
           <MapPin size={16} className="flex-shrink-0" />
           <span className="truncate">
             {imovel.endereco.bairro}, {imovel.endereco.cidade} - {imovel.endereco.estado}

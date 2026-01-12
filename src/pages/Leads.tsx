@@ -61,7 +61,7 @@ export const Leads: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       <header className="bg-gradient-to-r from-slate-900 via-slate-800 to-blue-900 text-white shadow-2xl">
         <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center">
             <div className="flex items-center gap-4">
               <Users size={32} className="text-gold-400" />
               <div>
@@ -76,17 +76,17 @@ export const Leads: React.FC = () => {
                 </p>
               </div>
             </div>
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-3">
               <Link
                 to="/admin"
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 w-full sm:w-auto"
               >
                 <Building2 size={20} />
                 Imóveis
               </Link>
               <Link
                 to="/"
-                className="px-4 py-2 bg-white text-slate-800 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+                className="px-4 py-2 bg-white text-slate-800 hover:bg-slate-100 rounded-lg transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 w-full sm:w-auto"
               >
                 <Home size={20} />
                 Ver Catálogo

@@ -275,24 +275,24 @@ export const DetalhesImovel: React.FC = () => {
 
             {/* Informações Principais */}
             <div className="bg-white rounded-lg shadow-lg p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div>
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+                <div className="flex-1 min-w-0">
                   <span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold mb-2">
                     {imovel.categoria} - {imovel.tipo}
                   </span>
-                  <h1 className="text-3xl font-bold text-slate-800 font-display">{imovel.titulo}</h1>
+                  <h1 className="text-3xl font-bold text-slate-800 font-display break-words">{imovel.titulo}</h1>
                 </div>
-                <div className="text-right">
+                <div className="w-full sm:w-auto text-left sm:text-right">
                   <div className="text-sm text-slate-600 mb-1">{imovel.tipologia.tipoVenda}</div>
-                  <div className="text-3xl font-bold text-blue-600 font-display">
+                  <div className="text-3xl font-bold text-blue-600 font-display break-words leading-tight">
                     {formatarMoeda(imovel.preco)}
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 text-slate-600 mb-6">
-                <MapPin size={20} />
-                <span>
+              <div className="flex items-start gap-2 text-slate-600 mb-6 min-w-0">
+                <MapPin size={20} className="flex-shrink-0 mt-0.5" />
+                <span className="break-words">
                   {imovel.endereco.bairro}, {imovel.endereco.cidade} - {imovel.endereco.estado}
                 </span>
               </div>
@@ -357,45 +357,45 @@ export const DetalhesImovel: React.FC = () => {
               <h2 className="text-xl font-semibold text-slate-800 mb-4">Ficha Técnica</h2>
               <div className="grid grid-cols-2 gap-4">
                 {imovel.fichaTecnica.areaTotal && (
-                  <div className="flex justify-between py-2 border-b border-slate-200">
+                  <div className="flex justify-between gap-3 py-2 border-b border-slate-200 min-w-0">
                     <span className="text-slate-600">Área Total:</span>
-                    <span className="font-semibold text-slate-800">{imovel.fichaTecnica.areaTotal} m²</span>
+                    <span className="font-semibold text-slate-800 text-right break-words">{imovel.fichaTecnica.areaTotal} m²</span>
                   </div>
                 )}
                 {imovel.fichaTecnica.areaConstruida && (
-                  <div className="flex justify-between py-2 border-b border-slate-200">
+                  <div className="flex justify-between gap-3 py-2 border-b border-slate-200 min-w-0">
                     <span className="text-slate-600">Área Construída:</span>
-                    <span className="font-semibold text-slate-800">{imovel.fichaTecnica.areaConstruida} m²</span>
+                    <span className="font-semibold text-slate-800 text-right break-words">{imovel.fichaTecnica.areaConstruida} m²</span>
                   </div>
                 )}
                 {imovel.fichaTecnica.suites && (
-                  <div className="flex justify-between py-2 border-b border-slate-200">
+                  <div className="flex justify-between gap-3 py-2 border-b border-slate-200 min-w-0">
                     <span className="text-slate-600">Suítes:</span>
-                    <span className="font-semibold text-slate-800">{imovel.fichaTecnica.suites}</span>
+                    <span className="font-semibold text-slate-800 text-right break-words">{imovel.fichaTecnica.suites}</span>
                   </div>
                 )}
                 {imovel.fichaTecnica.anoConstructao && (
-                  <div className="flex justify-between py-2 border-b border-slate-200">
+                  <div className="flex justify-between gap-3 py-2 border-b border-slate-200 min-w-0">
                     <span className="text-slate-600">Ano de Construção:</span>
-                    <span className="font-semibold text-slate-800">{imovel.fichaTecnica.anoConstructao}</span>
+                    <span className="font-semibold text-slate-800 text-right break-words">{imovel.fichaTecnica.anoConstructao}</span>
                   </div>
                 )}
-                <div className="flex justify-between py-2 border-b border-slate-200">
+                <div className="flex justify-between gap-3 py-2 border-b border-slate-200 min-w-0">
                   <span className="text-slate-600">Mobiliado:</span>
-                  <span className="font-semibold text-slate-800">
+                  <span className="font-semibold text-slate-800 text-right break-words">
                     {imovel.fichaTecnica.mobiliado ? 'Sim' : 'Não'}
                   </span>
                 </div>
                 {(imovel.tipo === 'Lote' || imovel.tipo === 'Lote em Condomínio') && imovel.fichaTecnica.valorItu && (
-                  <div className="flex justify-between py-2 border-b border-slate-200">
+                  <div className="flex justify-between gap-3 py-2 border-b border-slate-200 min-w-0">
                     <span className="text-slate-600">ITU (Anual):</span>
-                    <span className="font-semibold text-slate-800 font-display">{formatarMoeda(imovel.fichaTecnica.valorItu)}</span>
+                    <span className="font-semibold text-slate-800 font-display text-right break-words">{formatarMoeda(imovel.fichaTecnica.valorItu)}</span>
                   </div>
                 )}
                 {imovel.tipo !== 'Lote' && imovel.tipo !== 'Lote em Condomínio' && imovel.fichaTecnica.valorIptu && (
-                  <div className="flex justify-between py-2 border-b border-slate-200">
+                  <div className="flex justify-between gap-3 py-2 border-b border-slate-200 min-w-0">
                     <span className="text-slate-600">IPTU (Anual):</span>
-                    <span className="font-semibold text-slate-800 font-display">{formatarMoeda(imovel.fichaTecnica.valorIptu)}</span>
+                    <span className="font-semibold text-slate-800 font-display text-right break-words">{formatarMoeda(imovel.fichaTecnica.valorIptu)}</span>
                   </div>
                 )}
               </div>
@@ -701,7 +701,7 @@ export const DetalhesImovel: React.FC = () => {
                   className="flex items-center gap-3 text-slate-700 hover:text-blue-600 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                 >
                   <Mail size={20} />
-                  <span>hygordavidaraujo@gmail.com</span>
+                  <span className="break-all">hygordavidaraujo@gmail.com</span>
                 </a>
               </div>
             </div>
