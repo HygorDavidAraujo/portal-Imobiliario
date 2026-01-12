@@ -792,21 +792,8 @@ app.get('/api/imoveis', async (req, res) => {
         res.status(500).json({ error: 'Erro ao buscar imóveis' });
     }
 });
-app.get('/api/imoveis/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const row = await db.prepare('SELECT * FROM imoveis WHERE id = ?').get(id);
-        if (!row) {
-            return res.status(404).json({ error: 'Imóvel não encontrado' });
-        }
-        res.json(mapRowToImovel(row));
-    }
-    catch (error) {
-        console.error('Erro ao buscar imóvel:', error);
-        res.status(500).json({ error: 'Erro ao buscar imóvel' });
-    }
-});
 // Gera um ID novo (pré-cadastro) para permitir upload de fotos na pasta correta.
+// IMPORTANTE: precisa vir antes de /api/imoveis/:id para não ser capturada como "id=next-id".
 // Observação: não “reserva” o ID globalmente; em cenários com múltiplos admins simultâneos,
 // o ID pode colidir. O POST /api/imoveis ainda valida e falha com 409 se já existir.
 app.get('/api/imoveis/next-id', authenticateAdmin, async (req, res) => {
@@ -822,6 +809,20 @@ app.get('/api/imoveis/next-id', authenticateAdmin, async (req, res) => {
         const detail = error instanceof Error ? error.message : String(error);
         console.error('Erro ao gerar next-id:', error);
         return res.status(500).json({ error: 'Erro ao gerar ID do imóvel', detail });
+    }
+});
+app.get('/api/imoveis/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const row = await db.prepare('SELECT * FROM imoveis WHERE id = ?').get(id);
+        if (!row) {
+            return res.status(404).json({ error: 'Imóvel não encontrado' });
+        }
+        res.json(mapRowToImovel(row));
+    }
+    catch (error) {
+        console.error('Erro ao buscar imóvel:', error);
+        res.status(500).json({ error: 'Erro ao buscar imóvel' });
     }
 });
 app.post('/api/imoveis', authenticateAdmin, async (req, res) => {
