@@ -156,6 +156,7 @@ export interface Lead {
 }
 
 export interface FiltrosCatalogo {
+  q?: string;
   categoria?: CategoriaImovel;
   tipo?: string;
   bairro?: string;

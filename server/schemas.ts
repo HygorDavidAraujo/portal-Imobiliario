@@ -185,6 +185,7 @@ export const sendLeadEmailSchema = z.object({
     email: z.string().email('E-mail inválido'),
   }),
   link: z.string().url('URL do imóvel inválida').optional(),
+  mensagem: z.string().trim().max(1200, 'Mensagem muito longa').optional().or(z.literal('')),
 });
 
 // Função helper para validar e retornar erros formatados

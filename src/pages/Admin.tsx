@@ -1,13 +1,79 @@
 
+import React from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { useImoveis } from '../contexts/ImoveisContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { Building2, Users, Home, Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
 import { obterFotoDestaque, formatarMoeda, otimizarUrlCloudinary } from '../utils/helpers';
 import { Skeleton } from '../components/Skeleton';
+import { ApiErrorBanner } from '../components/ApiErrorBanner';
 
 export const Admin: React.FC = () => {
-  const { imoveis, removerImovel, atualizarImovel, leadsNaoVisualizados, carregandoImoveis } = useImoveis();
+  const { imoveis, removerImovel, atualizarImovel, leadsNaoVisualizados, carregandoImoveis, apiError, clearApiError } = useImoveis();
   const navigate = useNavigate();
+
+  const [busyToggleIds, setBusyToggleIds] = React.useState<Set<string>>(() => new Set());
+  const [busyRemoveIds, setBusyRemoveIds] = React.useState<Set<string>>(() => new Set());
+  const [optimisticAtivoById, setOptimisticAtivoById] = React.useState<Record<string, boolean>>({});
+
+  const setBusyToggle = (id: string, busy: boolean) => {
+    setBusyToggleIds((prev) => {
+      const next = new Set(prev);
+      if (busy) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const setBusyRemove = (id: string, busy: boolean) => {
+    setBusyRemoveIds((prev) => {
+      const next = new Set(prev);
+      if (busy) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleAtivoMutation = useMutation({
+    mutationFn: async (input: { imovel: any; nextAtivo: boolean }) => {
+      await atualizarImovel(input.imovel.id, { ...input.imovel, ativo: input.nextAtivo });
+      return { ok: true as const };
+    },
+    onMutate: (input) => {
+      clearApiError();
+      setBusyToggle(input.imovel.id, true);
+      setOptimisticAtivoById((prev) => ({ ...prev, [input.imovel.id]: input.nextAtivo }));
+    },
+    onError: (_error, input) => {
+      setOptimisticAtivoById((prev) => {
+        const next = { ...prev };
+        delete next[input.imovel.id];
+        return next;
+      });
+    },
+    onSettled: (_data, _error, input) => {
+      setBusyToggle(input.imovel.id, false);
+      setOptimisticAtivoById((prev) => {
+        const next = { ...prev };
+        delete next[input.imovel.id];
+        return next;
+      });
+    },
+  });
+
+  const removerImovelMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await removerImovel(id);
+      return { ok: true as const };
+    },
+    onMutate: (id) => {
+      clearApiError();
+      setBusyRemove(id, true);
+    },
+    onSettled: (_data, _error, id) => {
+      setBusyRemove(id, false);
+    },
+  });
 
   const handleLogout = () => {
     localStorage.removeItem('adminSession');
@@ -16,23 +82,17 @@ export const Admin: React.FC = () => {
   };
 
   const handleToggleAtivo = async (imovel: any) => {
-    try {
-      await atualizarImovel(imovel.id, { ...imovel, ativo: !imovel.ativo });
-    } catch (error) {
-      console.error('Erro ao alterar status:', error);
-      alert('Erro ao alterar status do imóvel. Tente novamente.');
-    }
+    if (busyRemoveIds.has(imovel.id) || busyToggleIds.has(imovel.id)) return;
+    const currentAtivo = Object.prototype.hasOwnProperty.call(optimisticAtivoById, imovel.id)
+      ? optimisticAtivoById[imovel.id]
+      : Boolean(imovel.ativo);
+    toggleAtivoMutation.mutate({ imovel, nextAtivo: !currentAtivo });
   };
 
   const handleRemover = async (id: string) => {
-    if (window.confirm('Tem certeza que deseja remover este imóvel?')) {
-      try {
-        await removerImovel(id);
-      } catch (error) {
-        console.error('Erro ao remover imóvel:', error);
-        alert('Erro ao remover imóvel. Tente novamente.');
-      }
-    }
+    if (busyRemoveIds.has(id) || busyToggleIds.has(id)) return;
+    if (!window.confirm('Tem certeza que deseja remover este imóvel?')) return;
+    removerImovelMutation.mutate(id);
   };
 
   return (
@@ -77,6 +137,13 @@ export const Admin: React.FC = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
+        {apiError && (
+          <ApiErrorBanner
+            message={apiError}
+            onClose={clearApiError}
+            className="mb-6"
+          />
+        )}
         <div className="mb-6 flex justify-between items-center">
           <h2 className="text-2xl font-bold text-slate-800">
             {imoveis.length} {imoveis.length === 1 ? 'imóvel cadastrado' : 'imóveis cadastrados'}
@@ -138,11 +205,19 @@ export const Admin: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
-            {imoveis.map((imovel) => (
-              <div
-                key={imovel.id}
-                className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
-              >
+            {imoveis.map((imovel) => {
+              const isToggling = busyToggleIds.has(imovel.id);
+              const isRemoving = busyRemoveIds.has(imovel.id);
+              const isBusy = isToggling || isRemoving;
+              const ativo = Object.prototype.hasOwnProperty.call(optimisticAtivoById, imovel.id)
+                ? optimisticAtivoById[imovel.id]
+                : Boolean(imovel.ativo);
+
+              return (
+                <div
+                  key={imovel.id}
+                  className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
+                >
                 <div className="flex flex-col md:flex-row">
                   {/* Foto */}
                   <div className="md:w-64 h-48 md:h-auto bg-slate-200 flex-shrink-0">
@@ -167,8 +242,8 @@ export const Admin: React.FC = () => {
                           <span className="inline-block bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-display font-semibold">
                             #{imovel.id}
                           </span>
-                          <span className={`inline-block ${imovel.ativo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} px-3 py-1 rounded-full text-xs font-semibold`}>
-                            {imovel.ativo ? 'Ativo' : 'Inativo'}
+                          <span className={`inline-block ${ativo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} px-3 py-1 rounded-full text-xs font-semibold`}>
+                            {ativo ? 'Ativo' : 'Inativo'}
                           </span>
                           <span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold">
                             {imovel.categoria} - {imovel.tipo}
@@ -197,35 +272,46 @@ export const Admin: React.FC = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleToggleAtivo(imovel)}
+                        disabled={isBusy}
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                          imovel.ativo
-                            ? 'bg-orange-600 text-white hover:bg-orange-700'
-                            : 'bg-green-600 text-white hover:bg-green-700'
+                          isBusy
+                            ? 'bg-slate-300 text-slate-600 cursor-not-allowed'
+                            : ativo
+                              ? 'bg-orange-600 text-white hover:bg-orange-700'
+                              : 'bg-green-600 text-white hover:bg-green-700'
                         }`}
-                        title={imovel.ativo ? 'Desativar (ocultar do catálogo)' : 'Ativar (mostrar no catálogo)'}
+                        title={ativo ? 'Desativar (ocultar do catálogo)' : 'Ativar (mostrar no catálogo)'}
                       >
-                        {imovel.ativo ? <EyeOff size={16} /> : <Eye size={16} />}
-                        {imovel.ativo ? 'Desativar' : 'Ativar'}
+                        {ativo ? <EyeOff size={16} /> : <Eye size={16} />}
+                        {isToggling ? 'Alterando...' : ativo ? 'Desativar' : 'Ativar'}
                       </button>
                       <Link
                         to={`/admin/imovel/${imovel.id}`}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        aria-disabled={isBusy}
+                        tabIndex={isBusy ? -1 : 0}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                          isBusy ? 'bg-slate-300 text-slate-600 pointer-events-none' : 'bg-blue-600 text-white hover:bg-blue-700'
+                        }`}
                       >
                         <Edit size={16} />
                         Editar
                       </Link>
                       <button
                         onClick={() => handleRemover(imovel.id)}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                        disabled={isBusy}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                          isBusy ? 'bg-slate-300 text-slate-600 cursor-not-allowed' : 'bg-red-600 text-white hover:bg-red-700'
+                        }`}
                       >
                         <Trash2 size={16} />
-                        Remover
+                        {isRemoving ? 'Removendo...' : 'Remover'}
                       </button>
                     </div>
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

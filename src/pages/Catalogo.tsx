@@ -6,27 +6,90 @@ import { formatarMoeda, obterFotoDestaque, otimizarUrlCloudinary } from '../util
 import { Phone, Mail, Facebook, Instagram, MapPin, Bed, Bath, Car, Maximize, Search, Filter, Heart } from 'lucide-react';
 import logo from '../img/logo.png';
 import { Skeleton } from '../components/Skeleton';
+import { ApiErrorBanner } from '../components/ApiErrorBanner';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { getImoveisFacets, getImoveisPage } from '../api/imoveis';
 
 export const Catalogo: React.FC = () => {
   const {
-    imoveis,
     favoritos,
-    paginacaoImoveis,
-    carregandoImoveis,
-    carregarProximaPaginaImoveis,
-    aplicarFiltrosCatalogo,
-    sortImoveisAtual,
-    definirOrdenacaoImoveis,
+    apiError,
+    clearApiError,
   } = useImoveis();
   const [filtros, setFiltros] = useState<FiltrosCatalogo>({});
+  const [buscaTexto, setBuscaTexto] = useState('');
+  const [buscaTextoDebounced, setBuscaTextoDebounced] = useState('');
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [mostrarApensFavoritos, setMostrarApenasFavoritos] = useState(false);
 
-  const [bairrosUnicos, setBairrosUnicos] = useState<string[]>([]);
-  const [cidadesUnicas, setCidadesUnicas] = useState<string[]>([]);
-  const [tiposUnicos, setTiposUnicos] = useState<string[]>([]);
+  const [sort, setSort] = useState<'data-desc' | 'data-asc' | 'preco-asc' | 'preco-desc'>('data-desc');
+  const [dismissQueryError, setDismissQueryError] = useState(false);
+
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setBuscaTextoDebounced(buscaTexto.trim());
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [buscaTexto]);
+
+  const filtrosEfetivos = useMemo<FiltrosCatalogo>(() => {
+    return {
+      ...filtros,
+      q: buscaTextoDebounced || undefined,
+    };
+  }, [filtros, buscaTextoDebounced]);
+
+  useEffect(() => {
+    setDismissQueryError(false);
+  }, [mostrarApensFavoritos, filtrosEfetivos, sort]);
+
+  const facetsQuery = useQuery({
+    queryKey: ['imoveis', 'facets'],
+    queryFn: getImoveisFacets,
+    staleTime: 1000 * 60 * 60,
+    retry: 1,
+  });
+
+  const bairrosUnicos = facetsQuery.data?.bairros ?? [];
+  const cidadesUnicas = facetsQuery.data?.cidades ?? [];
+  const tiposUnicos = facetsQuery.data?.tipos ?? [];
+
+  const imoveisQuery = useInfiniteQuery({
+    queryKey: ['imoveis', 'catalogo', { filtros: filtrosEfetivos, sort }],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) =>
+      getImoveisPage({
+        page: Number(pageParam ?? 1),
+        limit: 20,
+        sort,
+        filtros: filtrosEfetivos,
+      }),
+    getNextPageParam: (lastPage) => {
+      if (!lastPage.pagination?.hasNextPage) return undefined;
+      return lastPage.pagination.page + 1;
+    },
+    enabled: !mostrarApensFavoritos,
+    retry: 1,
+  });
+
+  const imoveis = useMemo(() => {
+    const pages = imoveisQuery.data?.pages || [];
+    return pages.flatMap((p) => p.data || []);
+  }, [imoveisQuery.data]);
+
+  const paginacaoImoveis = useMemo(() => {
+    const pages = imoveisQuery.data?.pages || [];
+    if (!pages.length) return null;
+    return pages[pages.length - 1]?.pagination ?? null;
+  }, [imoveisQuery.data]);
+
+  const queryErrorMessage = useMemo(() => {
+    if (dismissQueryError) return null;
+    if (!imoveisQuery.error) return null;
+    return imoveisQuery.error instanceof Error ? imoveisQuery.error.message : 'Falha ao carregar imóveis.';
+  }, [dismissQueryError, imoveisQuery.error]);
 
   // Filtros agora são aplicados no backend; no front filtramos apenas por favoritos.
   const imoveisFiltrados = useMemo(() => {
@@ -34,51 +97,53 @@ export const Catalogo: React.FC = () => {
     return imoveis.filter((imovel) => favoritos.includes(imovel.id));
   }, [imoveis, mostrarApensFavoritos, favoritos]);
 
-  // Carrega valores para selects (facets) uma única vez.
-  useEffect(() => {
-    const run = async () => {
-      try {
-        const res = await fetch(`${apiBaseUrl}/api/imoveis/facets`);
-        if (!res.ok) return;
-        const json = await res.json();
-        setBairrosUnicos(Array.isArray(json?.bairros) ? json.bairros : []);
-        setCidadesUnicas(Array.isArray(json?.cidades) ? json.cidades : []);
-        setTiposUnicos(Array.isArray(json?.tipos) ? json.tipos : []);
-      } catch {
-        // silencioso
-      }
-    };
-    void run();
-  }, [apiBaseUrl]);
+  const removerFiltro = (key: string) => {
+    if (key === 'q') {
+      setBuscaTexto('');
+      return;
+    }
+    setFiltros((prev) => {
+      const next: any = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
 
-  // Debounce: aplica filtros no backend.
-  useEffect(() => {
-    const t = window.setTimeout(() => {
-      if (mostrarApensFavoritos) return;
-      void aplicarFiltrosCatalogo(filtros);
-    }, 350);
-    return () => window.clearTimeout(t);
-  }, [filtros, mostrarApensFavoritos, aplicarFiltrosCatalogo]);
+  const chipsAtivos = useMemo(() => {
+    const chips: Array<{ key: string; label: string }> = [];
+    const q = buscaTexto.trim();
+    if (q) chips.push({ key: 'q', label: `Busca: ${q}` });
+    if (filtros.id) chips.push({ key: 'id', label: `ID: ${filtros.id}` });
+    if (filtros.categoria) chips.push({ key: 'categoria', label: `Categoria: ${filtros.categoria}` });
+    if (filtros.tipo) chips.push({ key: 'tipo', label: `Tipo: ${filtros.tipo}` });
+    if (filtros.bairro) chips.push({ key: 'bairro', label: `Bairro: ${filtros.bairro}` });
+    if (filtros.cidade) chips.push({ key: 'cidade', label: `Cidade: ${filtros.cidade}` });
+    if ((filtros as any).estado) chips.push({ key: 'estado', label: `Estado: ${(filtros as any).estado}` });
+    if (typeof filtros.precoMin === 'number') chips.push({ key: 'precoMin', label: `Preço mín: ${formatarMoeda(filtros.precoMin)}` });
+    if (typeof filtros.precoMax === 'number') chips.push({ key: 'precoMax', label: `Preço máx: ${formatarMoeda(filtros.precoMax)}` });
+    if (typeof filtros.quartos === 'number') chips.push({ key: 'quartos', label: `Quartos: ${filtros.quartos}+` });
+    return chips;
+  }, [buscaTexto, filtros]);
 
   // Scroll infinito: quando sentinel aparece, carrega próxima página.
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
     if (mostrarApensFavoritos) return;
-    if (!paginacaoImoveis?.hasNextPage) return;
+    if (!imoveisQuery.hasNextPage) return;
 
     const obs = new IntersectionObserver(
       (entries) => {
         const first = entries[0];
         if (!first?.isIntersecting) return;
-        if (carregandoImoveis) return;
-        void carregarProximaPaginaImoveis();
+        if (imoveisQuery.isFetchingNextPage) return;
+        void imoveisQuery.fetchNextPage();
       },
       { rootMargin: '600px' }
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [paginacaoImoveis?.hasNextPage, carregandoImoveis, carregarProximaPaginaImoveis, mostrarApensFavoritos]);
+  }, [imoveisQuery.hasNextPage, imoveisQuery.isFetchingNextPage, imoveisQuery.fetchNextPage, mostrarApensFavoritos]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -148,6 +213,47 @@ export const Catalogo: React.FC = () => {
       {/* Filtros */}
       <div className="bg-white shadow-md sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="mb-3">
+            <div className="relative">
+              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar por título, bairro, cidade..."
+                value={buscaTexto}
+                onChange={(e) => setBuscaTexto(e.target.value)}
+                aria-label="Buscar imóveis"
+                className="w-full pl-10 pr-4 py-3 md:py-2 min-h-11 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base md:text-sm"
+              />
+            </div>
+          </div>
+
+          {chipsAtivos.length > 0 && !mostrarApensFavoritos && (
+            <div className="flex flex-wrap gap-2 mb-3" aria-label="Filtros ativos">
+              {chipsAtivos.map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={() => removerFiltro(chip.key)}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                  title="Remover filtro"
+                >
+                  <span className="truncate max-w-[240px]">{chip.label}</span>
+                  <span aria-hidden="true" className="text-slate-500">×</span>
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setFiltros({});
+                  setBuscaTexto('');
+                }}
+                className="px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+              >
+                Limpar tudo
+              </button>
+            </div>
+          )}
+
           <button
             type="button"
             onClick={() => setMostrarFiltros(!mostrarFiltros)}
@@ -219,8 +325,8 @@ export const Catalogo: React.FC = () => {
               </select>
 
               <select
-                value={sortImoveisAtual}
-                onChange={(e) => void definirOrdenacaoImoveis(e.target.value as any)}
+                value={sort}
+                onChange={(e) => setSort(e.target.value as any)}
                 className="px-4 py-3 md:px-3 md:py-2 min-h-11 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base md:text-sm"
                 title="Ordenar resultados"
                 aria-label="Ordenar resultados"
@@ -245,6 +351,16 @@ export const Catalogo: React.FC = () => {
 
       {/* Resultados */}
       <div className="max-w-7xl mx-auto px-4 py-8">
+        {(apiError || queryErrorMessage) && (
+          <ApiErrorBanner
+            message={apiError || queryErrorMessage || ''}
+            onClose={() => {
+              clearApiError();
+              setDismissQueryError(true);
+            }}
+            className="mb-6"
+          />
+        )}
         <div className="mb-6 flex justify-between items-center flex-wrap gap-4">
           <h2 className="text-2xl font-bold text-slate-800">
             {paginacaoImoveis?.total != null && !mostrarApensFavoritos
@@ -272,7 +388,7 @@ export const Catalogo: React.FC = () => {
           </button>
         </div>
 
-        {carregandoImoveis && imoveis.length === 0 && !mostrarApensFavoritos ? (
+        {imoveisQuery.isLoading && imoveis.length === 0 && !mostrarApensFavoritos ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {Array.from({ length: 8 }).map((_, idx) => (
               <div key={idx} className="bg-white rounded-lg overflow-hidden shadow-lg">
@@ -311,20 +427,27 @@ export const Catalogo: React.FC = () => {
               ))}
             </div>
 
-            {paginacaoImoveis?.hasNextPage && !mostrarApensFavoritos && (
+            {imoveisQuery.hasNextPage && !mostrarApensFavoritos && (
               <div className="flex justify-center mt-10">
                 <button
-                  onClick={() => void carregarProximaPaginaImoveis()}
-                  disabled={carregandoImoveis}
+                  onClick={() => void imoveisQuery.fetchNextPage()}
+                  disabled={imoveisQuery.isFetchingNextPage}
                   className="px-6 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors font-semibold"
                 >
-                  {carregandoImoveis ? 'Carregando...' : 'Carregar mais imóveis'}
+                  {imoveisQuery.isFetchingNextPage ? 'Carregando...' : 'Carregar mais imóveis'}
                 </button>
               </div>
             )}
 
             {/* Sentinel do scroll infinito */}
-            <div ref={sentinelRef} className="h-1" />
+            {imoveisQuery.hasNextPage && !mostrarApensFavoritos && (
+              <div className="mt-6" aria-live="polite" aria-atomic="true">
+                {imoveisQuery.isFetchingNextPage && imoveis.length > 0 && (
+                  <div className="text-center text-sm text-slate-600">Carregando mais imóveis…</div>
+                )}
+                <div ref={sentinelRef} className="h-6" />
+              </div>
+            )}
           </>
         )}
       </div>

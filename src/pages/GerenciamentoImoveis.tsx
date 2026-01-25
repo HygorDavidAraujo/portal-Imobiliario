@@ -4,6 +4,8 @@ import { useImoveis } from '../contexts/ImoveisContext';
 import { Imovel, CategoriaImovel, TipoComercial, TipoResidencial, TipoRural, TipoAlqueire, Foto } from '../types';
 import { validarCPF, validarEmail, validarTelefone, formatarValorBrasileiro, converterValorBrasileiroParaNumero } from '../utils/helpers';
 import { Upload, X, Check, ArrowLeft, Save } from 'lucide-react';
+import { useMutation } from '@tanstack/react-query';
+import { deleteImovelImage, getNextImovelId, uploadImovelImage } from '../api/adminImoveis';
 
 const tiposComercial: TipoComercial[] = ['Casa', 'Sobrado', 'Sala', 'Área/Lote'];
 const tiposResidencial: TipoResidencial[] = ['Casa em Condomínio', 'Casa', 'Sobrado em Condomínio', 'Sobrado', 'Apartamento', 'Lote', 'Lote em Condomínio'];
@@ -230,7 +232,80 @@ export const GerenciamentoImoveis: React.FC = () => {
 
   const [uploadingImages, setUploadingImages] = React.useState(false);
   const [pendingUploads, setPendingUploads] = React.useState<Array<{ localId: string; file: File; previewUrl: string }>>([]);
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+
+  const isEditing = Boolean(id);
+
+  const uploadImageMutation = useMutation({
+    mutationFn: uploadImovelImage,
+  });
+
+  const deleteImageMutation = useMutation({
+    mutationFn: deleteImovelImage,
+  });
+
+  const saveExistingMutation = useMutation({
+    mutationFn: async (input: { id: string; imovel: Imovel }) => {
+      await atualizarImovel(input.id, input.imovel);
+      return { ok: true as const };
+    },
+  });
+
+  const createNewMutation = useMutation({
+    mutationFn: async (input: { imovel: Imovel; fotos: Foto[]; pendingUploads: Array<{ localId: string; file: File; previewUrl: string }> }) => {
+      const token = localStorage.getItem('adminToken');
+      if (!token) {
+        throw new Error('Você precisa estar autenticado para cadastrar imóvel');
+      }
+
+      // 1) Buscar um ID para poder enviar as fotos para a pasta correta
+      const reserve = await getNextImovelId(input.imovel.tipo);
+      const novoId = String(reserve?.id || '').trim();
+      if (!novoId) {
+        throw new Error('Servidor não retornou um ID válido');
+      }
+
+      // 2) Upload das fotos locais (na ordem exibida)
+      const pendingMap = new Map(input.pendingUploads.map((p) => [p.localId, p] as const));
+      const localFotosInOrder = input.fotos.filter((f) => pendingMap.has(f.id));
+      const destaqueId = input.fotos.find((f) => f.isDestaque)?.id;
+
+      const fotosEnviadas: Foto[] = [];
+      for (let i = 0; i < localFotosInOrder.length; i++) {
+        const fotoLocal = localFotosInOrder[i];
+        const pending = pendingMap.get(fotoLocal.id);
+        if (!pending) continue;
+
+        const uploaded = await uploadImovelImage({ imovelId: novoId, file: pending.file });
+        fotosEnviadas.push({
+          id: uploaded.publicId,
+          url: uploaded.url,
+          isDestaque: destaqueId ? fotoLocal.id === destaqueId : i === 0,
+        });
+      }
+
+      // Garante que exista uma foto destaque
+      if (fotosEnviadas.length > 0 && !fotosEnviadas.some((f) => f.isDestaque)) {
+        fotosEnviadas[0].isDestaque = true;
+      }
+
+      // 3) Salvar o imóvel já com fotos e com ID definido
+      const imovelFinalComId: Imovel = {
+        ...input.imovel,
+        id: novoId,
+        fotos: fotosEnviadas,
+      };
+
+      await adicionarImovel(imovelFinalComId);
+      return { id: novoId };
+    },
+  });
+
+  const isBusy =
+    uploadingImages ||
+    uploadImageMutation.isPending ||
+    deleteImageMutation.isPending ||
+    saveExistingMutation.isPending ||
+    createNewMutation.isPending;
 
   const pendingUploadsRef = React.useRef(pendingUploads);
   React.useEffect(() => {
@@ -255,7 +330,6 @@ export const GerenciamentoImoveis: React.FC = () => {
 
     const files = Array.from(e.target.files);
     const token = localStorage.getItem('adminToken');
-    
     if (!token) {
       setErros(['Você precisa estar autenticado para enviar imagens']);
       return;
@@ -270,23 +344,7 @@ export const GerenciamentoImoveis: React.FC = () => {
 
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
-          const formData = new FormData();
-          formData.append('image', file);
-          formData.append('imovelId', id);
-
-          const response = await fetch(`${apiBaseUrl}/api/upload-image`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-            body: formData,
-          });
-
-          if (!response.ok) {
-            throw new Error('Erro ao fazer upload da imagem');
-          }
-
-          const data = await response.json();
+          const data = await uploadImageMutation.mutateAsync({ imovelId: id, file });
           novasFotos.push({
             id: data.publicId,
             url: data.url,
@@ -324,18 +382,38 @@ export const GerenciamentoImoveis: React.FC = () => {
     }
   };
 
-  const removerFoto = (id: string) => {
+  const removerFoto = async (fotoId: string) => {
+    if (isBusy) return;
+
     // Se for uma foto local (pré-upload), remove também da lista de pendências e revoga o preview.
-    const pending = pendingUploads.find((p) => p.localId === id);
+    const pending = pendingUploads.find((p) => p.localId === fotoId);
     if (pending) {
       try {
         URL.revokeObjectURL(pending.previewUrl);
       } catch {
         // ignore
       }
-      setPendingUploads((prev) => prev.filter((p) => p.localId !== id));
+      setPendingUploads((prev) => prev.filter((p) => p.localId !== fotoId));
+      setFotos((prev) => prev.filter((f) => f.id !== fotoId));
+      return;
     }
-    setFotos((prev) => prev.filter((f) => f.id !== id));
+
+    // Se já estiver salvo (edição), tenta remover também no Cloudinary.
+    if (isEditing) {
+      setUploadingImages(true);
+      try {
+        await deleteImageMutation.mutateAsync(fotoId);
+        setFotos((prev) => prev.filter((f) => f.id !== fotoId));
+      } catch (error) {
+        console.error('Erro ao remover foto:', error);
+        setErros(['Não foi possível remover a foto agora. Tente novamente.']);
+      } finally {
+        setUploadingImages(false);
+      }
+      return;
+    }
+
+    setFotos((prev) => prev.filter((f) => f.id !== fotoId));
   };
 
   const marcarComoDestaque = (id: string) => {
@@ -377,6 +455,8 @@ export const GerenciamentoImoveis: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isBusy) return;
     
     if (!validarFormulario()) {
       console.log('Formulário inválido, abortando...');
@@ -495,88 +575,22 @@ export const GerenciamentoImoveis: React.FC = () => {
     }
 
     try {
+      setUploadingImages(true);
       if (id) {
-        await atualizarImovel(id, imovelFinal);
+        await saveExistingMutation.mutateAsync({ id, imovel: imovelFinal });
       } else {
-        const token = localStorage.getItem('adminToken');
-        if (!token) {
-          setErros(['Você precisa estar autenticado para cadastrar imóvel']);
-          window.scrollTo(0, 0);
-          return;
-        }
-
-        setUploadingImages(true);
-
-        // 1) Buscar um ID para poder enviar as fotos para a pasta correta
-        const reserveResponse = await fetch(
-          `${apiBaseUrl}/api/imoveis/next-id?tipo=${encodeURIComponent(tipo)}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          }
-        );
-
-        if (!reserveResponse.ok) {
-          throw new Error('Erro ao gerar ID do imóvel');
-        }
-
-        const reserveData = await reserveResponse.json();
-        const novoId = String(reserveData?.id || '').trim();
-        if (!novoId) {
-          throw new Error('Servidor não retornou um ID válido');
-        }
-
-        // 2) Upload das fotos locais (na ordem exibida)
-        const pendingMap = new Map(pendingUploads.map((p) => [p.localId, p] as const));
-        const localFotosInOrder = fotos.filter((f) => pendingMap.has(f.id));
-        const destaqueId = fotos.find((f) => f.isDestaque)?.id;
-
-        const fotosEnviadas: Foto[] = [];
-        for (let i = 0; i < localFotosInOrder.length; i++) {
-          const fotoLocal = localFotosInOrder[i];
-          const pending = pendingMap.get(fotoLocal.id);
-          if (!pending) continue;
-
-          const formData = new FormData();
-          formData.append('image', pending.file);
-          formData.append('imovelId', novoId);
-
-          const uploadResponse = await fetch(`${apiBaseUrl}/api/upload-image`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-            body: formData,
-          });
-
-          if (!uploadResponse.ok) {
-            const detail = await uploadResponse.text().catch(() => '');
-            throw new Error(detail || 'Erro ao fazer upload da imagem');
-          }
-
-          const data = await uploadResponse.json();
-          fotosEnviadas.push({
-            id: data.publicId,
-            url: data.url,
-            isDestaque: destaqueId ? fotoLocal.id === destaqueId : i === 0,
-          });
-        }
-
-        // Garante que exista uma foto destaque
-        if (fotosEnviadas.length > 0 && !fotosEnviadas.some((f) => f.isDestaque)) {
-          fotosEnviadas[0].isDestaque = true;
-        }
-
-        // 3) Salvar o imóvel já com fotos e com ID definido
-        const imovelFinalComId: Imovel = {
-          ...imovelFinal,
-          id: novoId,
-          fotos: fotosEnviadas,
-        };
-
-        await adicionarImovel(imovelFinalComId);
+        await createNewMutation.mutateAsync({ imovel: imovelFinal, fotos, pendingUploads });
       }
+
+      // Limpa previews locais (cadastro) antes de navegar
+      for (const item of pendingUploadsRef.current) {
+        try {
+          URL.revokeObjectURL(item.previewUrl);
+        } catch {
+          // ignore
+        }
+      }
+      setPendingUploads([]);
       navigate('/admin');
     } catch (error) {
       console.error('Erro ao salvar imóvel:', error);
@@ -608,7 +622,10 @@ export const GerenciamentoImoveis: React.FC = () => {
         <div className="mb-6 flex items-center justify-between">
           <button
             onClick={() => navigate('/admin')}
-            className="flex items-center gap-2 text-slate-600 hover:text-blue-600 transition-colors"
+            disabled={isBusy}
+            className={`flex items-center gap-2 transition-colors ${
+              isBusy ? 'text-slate-400 cursor-not-allowed' : 'text-slate-600 hover:text-blue-600'
+            }`}
           >
             <ArrowLeft size={20} />
             Voltar
@@ -1638,7 +1655,7 @@ export const GerenciamentoImoveis: React.FC = () => {
                   accept="image/*"
                   onChange={handleFileChange}
                   className="hidden"
-                  disabled={uploadingImages}
+                  disabled={isBusy}
                 />
               </label>
                             
@@ -1662,6 +1679,7 @@ export const GerenciamentoImoveis: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => marcarComoDestaque(foto.id)}
+                          disabled={isBusy}
                           className={`p-2 rounded-full ${
                             foto.isDestaque ? 'bg-gold-500' : 'bg-white'
                           } hover:scale-110 transition-transform`}
@@ -1671,7 +1689,8 @@ export const GerenciamentoImoveis: React.FC = () => {
                         </button>
                         <button
                           type="button"
-                          onClick={() => removerFoto(foto.id)}
+                          onClick={() => void removerFoto(foto.id)}
+                          disabled={isBusy}
                           className="p-2 bg-red-500 rounded-full hover:scale-110 transition-transform"
                           title="Remover foto"
                         >
@@ -1750,19 +1769,22 @@ export const GerenciamentoImoveis: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate('/admin')}
-              className="px-6 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
+              disabled={isBusy}
+              className={`px-6 py-3 border border-slate-300 rounded-lg transition-colors ${
+                isBusy ? 'text-slate-400 cursor-not-allowed' : 'text-slate-700 hover:bg-slate-50'
+              }`}
             >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={uploadingImages}
+              disabled={isBusy}
               className={`px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg transition-all flex items-center gap-2 shadow-lg hover:shadow-xl ${
-                uploadingImages ? 'opacity-70 cursor-wait' : 'hover:from-blue-700 hover:to-blue-800'
+                isBusy ? 'opacity-70 cursor-wait' : 'hover:from-blue-700 hover:to-blue-800'
               }`}
             >
               <Save size={20} />
-              {uploadingImages ? 'Salvando...' : (id ? 'Atualizar Imóvel' : 'Cadastrar Imóvel')}
+              {isBusy ? 'Salvando...' : (id ? 'Atualizar Imóvel' : 'Cadastrar Imóvel')}
             </button>
           </div>
         </form>

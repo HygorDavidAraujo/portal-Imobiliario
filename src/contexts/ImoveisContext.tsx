@@ -104,7 +104,9 @@ export const ImoveisProvider: React.FC<ImoveisProviderProps> = ({ children }) =>
     let errorMessage = defaultMessage;
     try {
       const errorData = await response.json();
-      if (errorData && errorData.detail) {
+      if (errorData && errorData.message) {
+        errorMessage = errorData.message;
+      } else if (errorData && errorData.detail) {
         errorMessage = errorData.detail;
       } else if (errorData && errorData.error) {
         errorMessage = errorData.error;
@@ -132,6 +134,7 @@ export const ImoveisProvider: React.FC<ImoveisProviderProps> = ({ children }) =>
     }
 
     const filtros = opts.filtros || {};
+    if (filtros.q) params.set('q', filtros.q);
     if (filtros.id) params.set('id', filtros.id);
     if (filtros.categoria) params.set('categoria', filtros.categoria);
     if (filtros.tipo) params.set('tipo', filtros.tipo);
@@ -263,20 +266,15 @@ export const ImoveisProvider: React.FC<ImoveisProviderProps> = ({ children }) =>
           return;
         }
 
-        // Público: carrega primeira página, e só.
-        const { data, pagination } = await fetchImoveisPage({ page: 1, limit: 20, sort: 'data-desc' });
-        setImoveis(data);
-        setPaginacaoImoveis(pagination);
+        // Público: listagem/detalhes são carregados via React Query nas páginas.
+        setImoveis([]);
+        setPaginacaoImoveis(null);
         setPaginaImoveisAtual(1);
         setLeads([]);
         setPaginacaoLeads(null);
         setTotalLeads(0);
         setLeadsNaoVisualizados(0);
-
-        // Se a resposta ainda vier como array (compat), mantemos sem paginação.
-        if (!pagination) {
-          setPaginacaoImoveis(null);
-        }
+        return;
 
       } catch (error) {
         console.error('Erro ao carregar dados:', error);

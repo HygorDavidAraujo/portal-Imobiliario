@@ -3,6 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useImoveis } from '../contexts/ImoveisContext';
 import { ContatoCliente, Lead } from '../types';
 import { formatarMoeda, validarEmail, validarTelefone, enviarWhatsApp, categorizarAndar, obterDescricaoFachada, gerarId, otimizarUrlCloudinary } from '../utils/helpers';
+import { useQuery } from '@tanstack/react-query';
+import { getImovelById } from '../api/imoveis';
+import { useMutation } from '@tanstack/react-query';
+import { createLead, sendLeadEmail } from '../api/leads';
 import {
   ArrowLeft,
   MapPin,
@@ -20,27 +24,87 @@ import {
   ChevronRight,
   Heart,
 } from 'lucide-react';
+import { ApiErrorBanner } from '../components/ApiErrorBanner';
 
 export const DetalhesImovel: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { obterImovelPorId, contatoCliente, salvarContatoCliente, adicionarLead, toggleFavorito, isFavorito } = useImoveis();
-  const imovel = obterImovelPorId(id || '');
+  const { obterImovelPorId, contatoCliente, salvarContatoCliente, toggleFavorito, isFavorito, apiError, clearApiError } = useImoveis();
+  const imovelId = id || '';
+
+  const imovelQuery = useQuery({
+    queryKey: ['imovel', imovelId],
+    queryFn: () => getImovelById(imovelId),
+    enabled: !!imovelId,
+    retry: 1,
+  });
+
+  const imovel = imovelQuery.data || obterImovelPorId(imovelId);
   const [fotoAtual, setFotoAtual] = useState(0);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [nome, setNome] = useState(contatoCliente?.nome || '');
   const [telefone, setTelefone] = useState(contatoCliente?.telefone || '');
   const [email, setEmail] = useState(contatoCliente?.email || '');
+  const [mensagemContato, setMensagemContato] = useState('');
   const [erros, setErros] = useState<string[]>([]);
   const [favorito, setFavorito] = useState(isFavorito(id || ''));
-  const [enviando, setEnviando] = useState(false);
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+  const [leadError, setLeadError] = useState<string | null>(null);
+
+  const createLeadMutation = useMutation({
+    mutationFn: createLead,
+    onError: (error) => {
+      const msg = error instanceof Error ? error.message : 'Não foi possível registrar seu interesse agora. Tente novamente.';
+      setLeadError(msg);
+    },
+  });
+
+  const sendLeadEmailMutation = useMutation({
+    mutationFn: sendLeadEmail,
+    onError: (error) => {
+      const msg = error instanceof Error ? error.message : 'Não foi possível enviar seus dados agora. Tente novamente.';
+      setLeadError(msg);
+    },
+  });
+
+  const enviando = createLeadMutation.isPending || sendLeadEmailMutation.isPending;
 
   useEffect(() => {
-    if (!imovel) {
+    if (!imovelId) {
+      navigate('/');
+      return;
+    }
+    if (imovelQuery.isError) {
       navigate('/');
     }
-  }, [imovel, navigate]);
+  }, [imovelId, imovelQuery.isError, navigate]);
+
+  if (!imovelId) return null;
+  if (imovelQuery.isLoading && !imovel) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+        <header className="bg-gradient-to-r from-slate-900 via-slate-800 to-blue-900 text-white shadow-2xl">
+          <div className="max-w-7xl mx-auto px-4 py-4">
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center gap-2 text-white hover:text-gold-400 transition-colors rounded-lg px-2 py-2"
+            >
+              <ArrowLeft size={20} />
+              Voltar ao catálogo
+            </button>
+          </div>
+        </header>
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div className="p-6 space-y-4">
+              <div className="h-8 w-2/3 bg-slate-200 rounded animate-pulse" />
+              <div className="h-4 w-1/2 bg-slate-200 rounded animate-pulse" />
+              <div className="h-64 w-full bg-slate-200 rounded animate-pulse" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!imovel) return null;
 
@@ -116,7 +180,8 @@ export const DetalhesImovel: React.FC = () => {
 
   const enviarInteresse = async (contato: ContatoCliente) => {
     setErros([]);
-    setEnviando(true);
+    setLeadError(null);
+    if (enviando) return;
 
     const lead: Lead = {
       id: gerarId(),
@@ -131,6 +196,7 @@ export const DetalhesImovel: React.FC = () => {
       `*${imovel.titulo}*\n` +
       `Preço: ${formatarMoeda(imovel.preco)}\n` +
       `Localização: ${imovel.endereco.bairro}, ${imovel.endereco.cidade} - ${imovel.endereco.estado}\n\n` +
+      (mensagemContato.trim() ? `*Mensagem:*\n${mensagemContato.trim()}\n\n` : '') +
       `*Meus dados:*\n` +
       `Nome: ${contato.nome}\n` +
       `Telefone: ${contato.telefone}\n` +
@@ -143,30 +209,32 @@ export const DetalhesImovel: React.FC = () => {
       endereco: `${imovel.endereco.bairro}, ${imovel.endereco.cidade} - ${imovel.endereco.estado}`,
       contato,
       link: `${window.location.origin}/imovel/${imovel.id}`,
+      mensagem: mensagemContato.trim() || undefined,
     };
 
     try {
       // Salvar lead no banco de dados
-      await adicionarLead(lead);
-
-      // Enviar e-mail
-      const resposta = await fetch(`${apiBaseUrl}/api/send-lead`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+      await createLeadMutation.mutateAsync({
+        id: lead.id,
+        imovelId: lead.imovelId,
+        imovelTitulo: lead.imovelTitulo,
+        cliente: lead.cliente,
       });
 
-      if (!resposta.ok) {
-        throw new Error(await resposta.text());
-      }
+      // Enviar e-mail
+      await sendLeadEmailMutation.mutateAsync(payload);
 
       enviarWhatsApp('5562981831483', mensagem);
       setMostrarFormulario(false);
+      setMensagemContato('');
     } catch (error) {
       console.error('Erro ao enviar e-mail', error);
-      setErros(['Não foi possível enviar seus dados agora. Tente novamente.']);
-    } finally {
-      setEnviando(false);
+      const msg =
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível enviar seus dados agora. Tente novamente.';
+      setLeadError(msg);
+      setErros([msg]);
     }
   };
 
@@ -188,6 +256,20 @@ export const DetalhesImovel: React.FC = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 py-8 pb-28 lg:pb-8">
+        {apiError && (
+          <ApiErrorBanner
+            message={apiError}
+            onClose={clearApiError}
+            className="mb-6"
+          />
+        )}
+        {leadError && (
+          <ApiErrorBanner
+            message={leadError}
+            onClose={() => setLeadError(null)}
+            className="mb-6"
+          />
+        )}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Coluna Principal */}
           <div className="lg:col-span-2 space-y-6">
@@ -749,6 +831,7 @@ export const DetalhesImovel: React.FC = () => {
               <h3 className="text-2xl font-bold text-slate-800">Seus Dados</h3>
               <button
                 onClick={() => setMostrarFormulario(false)}
+                disabled={enviando}
                 className="text-slate-400 hover:text-slate-600 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                 aria-label="Fechar modal"
               >
@@ -775,6 +858,7 @@ export const DetalhesImovel: React.FC = () => {
                   type="text"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
+                  disabled={enviando}
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 />
@@ -788,6 +872,7 @@ export const DetalhesImovel: React.FC = () => {
                   type="tel"
                   value={telefone}
                   onChange={(e) => setTelefone(e.target.value)}
+                  disabled={enviando}
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="(00) 00000-0000"
                   required
@@ -802,9 +887,27 @@ export const DetalhesImovel: React.FC = () => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  disabled={enviando}
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Mensagem (opcional)
+                </label>
+                <textarea
+                  value={mensagemContato}
+                  onChange={(e) => setMensagemContato(e.target.value)}
+                  disabled={enviando}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[96px]"
+                  placeholder="Ex: Quero agendar uma visita no fim de semana..."
+                  maxLength={1200}
+                />
+                <div className="mt-1 text-xs text-slate-500">
+                  {mensagemContato.length}/1200
+                </div>
               </div>
 
               <button

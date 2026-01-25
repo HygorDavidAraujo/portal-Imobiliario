@@ -7,6 +7,7 @@ import { Admin } from './pages/Admin';
 import { GerenciamentoImoveis } from './pages/GerenciamentoImoveis';
 import { Leads } from './pages/Leads';
 import { AdminLogin } from './pages/AdminLogin';
+import { getJwtExpMs } from './utils/jwt';
 
 // Rota protegida para admin
 function PrivateRoute({ children }: { children: JSX.Element }) {
@@ -16,7 +17,9 @@ function PrivateRoute({ children }: { children: JSX.Element }) {
   if (session && token) {
     try {
       const { expires } = JSON.parse(session);
-      valid = Date.now() < expires;
+      const tokenExp = getJwtExpMs(token);
+      const effectiveExpires = typeof tokenExp === 'number' ? tokenExp : expires;
+      valid = Date.now() < effectiveExpires;
     } catch {}
   }
   return valid ? children : <Navigate to="/admin/login" replace />;

@@ -3,14 +3,35 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import helmet from 'helmet';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import multer, { MulterError } from 'multer';
+import rateLimit from 'express-rate-limit';
 import { v2 as cloudinary } from 'cloudinary';
 import { imovelSchema, leadSchema, sendLeadEmailSchema, validateAndFormat } from './schemas.js';
 
 dotenv.config();
+
+type ApiErrorBody = {
+  error: string; // compat com frontend atual
+  message: string;
+  code?: string;
+  details?: unknown;
+  detail?: unknown; // compat
+};
+
+const sendApiError = (res: Response, status: number, message: string, opts?: { code?: string; details?: unknown; detail?: unknown }) => {
+  const body: ApiErrorBody = {
+    error: message,
+    message,
+    ...(opts?.code ? { code: opts.code } : {}),
+    ...(typeof opts?.details !== 'undefined' ? { details: opts.details } : {}),
+    ...(typeof opts?.detail !== 'undefined' ? { detail: opts.detail } : {}),
+  };
+  return res.status(status).json(body);
+};
 
 const gerarId = (): string => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -52,6 +73,23 @@ const upload = multer({
 
 const app = express();
 
+// Behind proxy (Railway/Vercel/etc) we want correct req.ip.
+// Only enable trusting proxy headers in production unless explicitly configured.
+if (process.env.TRUST_PROXY) {
+  const trust = Number.parseInt(String(process.env.TRUST_PROXY), 10);
+  if (Number.isFinite(trust)) app.set('trust proxy', trust);
+} else if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
+app.use(
+  helmet({
+    // API server (no HTML rendering). CSP here is usually handled at the frontend.
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  })
+);
+
 // ==================== CONFIGURAÇÃO DE CORS (ANTES DAS ROTAS) ====================
 const allowedOrigins = [
   'http://localhost:5173',
@@ -64,9 +102,32 @@ const allowedOrigins = [
   process.env.VERCEL_URL,
 ].filter(Boolean) as string[];
 
+const allowedHosts = new Set(
+  allowedOrigins
+    .map((value) => {
+      try {
+        const hasScheme = /^https?:\/\//i.test(value);
+        const url = new URL(hasScheme ? value : `https://${value}`);
+        return url.hostname;
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean) as string[]
+);
+
+const isAllowedOrigin = (origin: string) => {
+  try {
+    const url = new URL(origin);
+    return allowedHosts.has(url.hostname);
+  } catch {
+    return false;
+  }
+};
+
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.some((allowed) => origin.includes(allowed))) {
+    if (!origin || isAllowedOrigin(origin)) {
       return callback(null, true);
     }
     callback(new Error('Not allowed by CORS'));
@@ -80,10 +141,58 @@ app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
+const makeRateLimiter = (opts: {
+  windowMs: number;
+  max: number;
+  message: string;
+  code: string;
+  standardHeaders?: boolean;
+  legacyHeaders?: boolean;
+}) =>
+  rateLimit({
+    windowMs: opts.windowMs,
+    max: opts.max,
+    standardHeaders: opts.standardHeaders ?? true,
+    legacyHeaders: opts.legacyHeaders ?? false,
+    handler: (_req, res) => {
+      return sendApiError(res, 429, opts.message, { code: opts.code });
+    },
+  });
+
+// P0 anti-spam/bruteforce (valores conservadores, ajustáveis)
+const otpSendLimiter = makeRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 8,
+  message: 'Muitas tentativas. Aguarde e tente novamente.',
+  code: 'RATE_OTP_SEND',
+});
+
+const otpValidateLimiter = makeRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: 'Muitas tentativas. Aguarde e tente novamente.',
+  code: 'RATE_OTP_VALIDATE',
+});
+
+const leadCreateLimiter = makeRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: 'Muitas solicitações. Aguarde e tente novamente.',
+  code: 'RATE_LEAD_CREATE',
+});
+
+const sendLeadLimiter = makeRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: 'Muitas solicitações. Aguarde e tente novamente.',
+  code: 'RATE_SEND_LEAD',
+});
+
 // ==================== LOGIN ADMIN OTP ====================
 const ADMIN_PHONE = '+5562981831483';
 const OTP_EXPIRATION = 60 * 1000; // 60 segundos
 const OTP_ATTEMPT_LIMIT = 5;
+const OTP_SECRET = process.env.OTP_SECRET;
 let adminOtp: {
   hash: string;
   expires: number;
@@ -96,7 +205,10 @@ function generateOtp() {
 }
 
 function hashOtp(otp: string) {
-  return crypto.createHash('sha256').update(otp + process.env.OTP_SECRET).digest('hex');
+  if (!OTP_SECRET) {
+    throw new Error('OTP_SECRET não definido no ambiente');
+  }
+  return crypto.createHash('sha256').update(otp + OTP_SECRET).digest('hex');
 }
 
 
@@ -160,13 +272,21 @@ async function sendOtpViaEmail(otp: string, email: string) {
 }
 
 // Rate limit básico: impede spam de envio
-app.post('/api/admin/send-otp', async (req: Request, res: Response) => {
+app.post('/api/admin/send-otp', otpSendLimiter, async (req: Request, res: Response) => {
   const now = Date.now();
   if (now - lastOtpSentAt < 5000) {
-    return res.status(429).json({ error: 'Aguarde alguns segundos para reenviar.' });
+    return sendApiError(res, 429, 'Aguarde alguns segundos para reenviar.', { code: 'OTP_RATE_LIMIT' });
+  }
+  if (!OTP_SECRET) {
+    return sendApiError(res, 500, 'Configuração inválida: OTP_SECRET ausente.', { code: 'OTP_MISCONFIG' });
   }
   const otp = generateOtp();
-  const hash = hashOtp(otp);
+  let hash = '';
+  try {
+    hash = hashOtp(otp);
+  } catch (e) {
+    return sendApiError(res, 500, 'Falha ao gerar OTP.', { code: 'OTP_HASH_ERROR', detail: String(e) });
+  }
   adminOtp = {
     hash,
     expires: now + OTP_EXPIRATION,
@@ -177,28 +297,32 @@ app.post('/api/admin/send-otp', async (req: Request, res: Response) => {
     await sendOtpViaEmail(otp, process.env.MAIL_TO || 'hygordavidaraujo@gmail.com');
   } catch (e) {
     console.error('Erro ao enviar e-mail:', e);
-    return res.status(500).json({ error: 'Erro ao enviar e-mail.' });
+    return sendApiError(res, 500, 'Erro ao enviar e-mail.', { code: 'OTP_EMAIL_ERROR' });
   }
   res.json({ ok: true });
 });
 
 // Validação do OTP
-app.post('/api/admin/validate-otp', express.json(), (req: Request, res: Response) => {
+app.post('/api/admin/validate-otp', otpValidateLimiter, express.json(), (req: Request, res: Response) => {
   const { otp } = req.body || {};
   if (!otp || typeof otp !== 'string' || otp.length !== 6) {
-    return res.status(400).json({ error: 'Código inválido.' });
+    return sendApiError(res, 400, 'Código inválido.', { code: 'OTP_INVALID' });
   }
   if (!adminOtp || Date.now() > adminOtp.expires) {
     adminOtp = null;
-    return res.status(400).json({ error: 'Código expirado. Solicite um novo.' });
+    return sendApiError(res, 400, 'Código expirado. Solicite um novo.', { code: 'OTP_EXPIRED' });
   }
   if (adminOtp.attempts >= OTP_ATTEMPT_LIMIT) {
     adminOtp = null;
-    return res.status(429).json({ error: 'Muitas tentativas. Solicite um novo código.' });
+    return sendApiError(res, 429, 'Muitas tentativas. Solicite um novo código.', { code: 'OTP_TOO_MANY_ATTEMPTS' });
   }
   adminOtp.attempts++;
-  if (hashOtp(otp) !== adminOtp.hash) {
-    return res.status(400).json({ error: 'Código incorreto.' });
+  try {
+    if (hashOtp(otp) !== adminOtp.hash) {
+      return sendApiError(res, 400, 'Código incorreto.', { code: 'OTP_WRONG' });
+    }
+  } catch (e) {
+    return sendApiError(res, 500, 'Configuração inválida: OTP_SECRET ausente.', { code: 'OTP_MISCONFIG', detail: String(e) });
   }
   // Sucesso: invalida o código e emite JWT
   adminOtp = null;
@@ -219,7 +343,7 @@ const authenticateAdmin = (req: AuthRequest, res: Response, next: NextFunction) 
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Token de autenticação não fornecido' });
+    return sendApiError(res, 401, 'Token de autenticação não fornecido', { code: 'AUTH_MISSING' });
   }
   
   const token = authHeader.substring(7);
@@ -228,16 +352,16 @@ const authenticateAdmin = (req: AuthRequest, res: Response, next: NextFunction) 
     const decoded = jwt.verify(token, JWT_SECRET) as { role: string; iat: number };
     
     if (decoded.role !== 'admin') {
-      return res.status(403).json({ error: 'Acesso negado' });
+      return sendApiError(res, 403, 'Acesso negado', { code: 'AUTH_FORBIDDEN' });
     }
     
     req.user = decoded;
     next();
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
-      return res.status(401).json({ error: 'Token expirado' });
+      return sendApiError(res, 401, 'Token expirado', { code: 'AUTH_EXPIRED' });
     }
-    return res.status(401).json({ error: 'Token inválido' });
+    return sendApiError(res, 401, 'Token inválido', { code: 'AUTH_INVALID' });
   }
 };
 
@@ -583,14 +707,16 @@ app.post('/api/upload-image', authenticateAdmin, upload.single('image'), async (
         CLOUDINARY_API_KEY: hasApiKey,
         CLOUDINARY_API_SECRET: hasApiSecret,
       });
-      return res.status(500).json({
-        error:
-          'Cloudinary não configurado no servidor. Defina CLOUDINARY_URL (recomendado) ou CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY e CLOUDINARY_API_SECRET.',
-      });
+      return sendApiError(
+        res,
+        500,
+        'Cloudinary não configurado no servidor. Defina CLOUDINARY_URL (recomendado) ou CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY e CLOUDINARY_API_SECRET.',
+        { code: 'CLOUDINARY_MISCONFIG' }
+      );
     }
 
     if (!req.file) {
-      return res.status(400).json({ error: 'Nenhuma imagem fornecida' });
+      return sendApiError(res, 400, 'Nenhuma imagem fornecida', { code: 'UPLOAD_NO_FILE' });
     }
 
     const imovelId = req.body.imovelId || 'temp';
@@ -622,7 +748,7 @@ app.post('/api/upload-image', authenticateAdmin, upload.single('image'), async (
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     console.error('Erro ao fazer upload:', error);
-    res.status(500).json({ error: 'Erro ao fazer upload da imagem', detail });
+    sendApiError(res, 500, 'Erro ao fazer upload da imagem', { code: 'UPLOAD_ERROR', detail });
   }
 });
 
@@ -631,14 +757,14 @@ app.delete('/api/delete-image', authenticateAdmin, async (req: AuthRequest, res:
   try {
     const { publicId } = req.body;
     if (!publicId) {
-      return res.status(400).json({ error: 'publicId é obrigatório' });
+      return sendApiError(res, 400, 'publicId é obrigatório', { code: 'DELETE_IMAGE_MISSING_PUBLIC_ID' });
     }
 
     await cloudinary.uploader.destroy(publicId);
     res.json({ ok: true });
   } catch (error) {
     console.error('Erro ao deletar imagem:', error);
-    res.status(500).json({ error: 'Erro ao deletar imagem' });
+    sendApiError(res, 500, 'Erro ao deletar imagem', { code: 'DELETE_IMAGE_ERROR' });
   }
 });
 
@@ -715,6 +841,7 @@ app.get('/api/imoveis', async (req: Request, res: Response) => {
     const wherePublico = status !== 'all';
 
     const filtroId = parseOptionalString(req.query.id);
+    const q = parseOptionalString(req.query.q);
     const categoria = parseOptionalString(req.query.categoria);
     const tipo = parseOptionalString(req.query.tipo);
     const bairro = parseOptionalString(req.query.bairro);
@@ -733,6 +860,15 @@ app.get('/api/imoveis', async (req: Request, res: Response) => {
     if (db?.prisma) {
       const where: any = wherePublico ? { ativo: true } : {};
       if (filtroId) where.id = { contains: filtroId, mode: 'insensitive' };
+      if (q) {
+        where.OR = [
+          { id: { contains: q, mode: 'insensitive' } },
+          { titulo: { contains: q, mode: 'insensitive' } },
+          { descricao: { contains: q, mode: 'insensitive' } },
+          { endereco_bairro: { contains: q, mode: 'insensitive' } },
+          { endereco_cidade: { contains: q, mode: 'insensitive' } },
+        ];
+      }
       if (categoria) where.categoria = categoria;
       if (tipo) where.tipo = tipo;
       if (bairro) where.endereco_bairro = { contains: bairro, mode: 'insensitive' };
@@ -787,6 +923,17 @@ app.get('/api/imoveis', async (req: Request, res: Response) => {
     if (filtroId) {
       conditions.push('LOWER(id) LIKE ?');
       whereParams.push(`%${filtroId.toLowerCase()}%`);
+    }
+    if (q) {
+      conditions.push('(' + [
+        'LOWER(id) LIKE ?',
+        'LOWER(titulo) LIKE ?',
+        'LOWER(descricao) LIKE ?',
+        'LOWER(endereco_bairro) LIKE ?',
+        'LOWER(endereco_cidade) LIKE ?',
+      ].join(' OR ') + ')');
+      const qLike = `%${q.toLowerCase()}%`;
+      whereParams.push(qLike, qLike, qLike, qLike, qLike);
     }
     if (categoria) {
       conditions.push('categoria = ?');
@@ -884,12 +1031,12 @@ app.get('/api/imoveis/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const row = await db.prepare('SELECT * FROM imoveis WHERE id = ?').get(id);
     if (!row) {
-      return res.status(404).json({ error: 'Imóvel não encontrado' });
+      return sendApiError(res, 404, 'Imóvel não encontrado', { code: 'IMOVEL_NOT_FOUND' });
     }
     res.json(mapRowToImovel(row));
   } catch (error) {
     console.error('Erro ao buscar imóvel:', error);
-    res.status(500).json({ error: 'Erro ao buscar imóvel' });
+    sendApiError(res, 500, 'Erro ao buscar imóvel', { code: 'IMOVEL_GET_ERROR' });
   }
 });
 
@@ -900,10 +1047,7 @@ app.post('/api/imoveis', authenticateAdmin, async (req: AuthRequest, res: Respon
     // --- Validação com Zod ---
     const validation = validateAndFormat(imovelSchema, imovel);
     if (!validation.success) {
-      return res.status(400).json({ 
-        error: 'Dados do imóvel inválidos',
-        details: validation.errors
-      });
+      return sendApiError(res, 400, 'Dados do imóvel inválidos', { code: 'IMOVEL_INVALID', details: validation.errors });
     }
     const validatedImovel = validation.data as any;
 
@@ -916,15 +1060,18 @@ app.post('/api/imoveis', authenticateAdmin, async (req: AuthRequest, res: Respon
       const prefixOk = requestedId.startsWith(prefixoEsperado);
       const suffixOk = suffix.length >= 3 && /^[0-9]+$/.test(suffix);
       if (!prefixOk || !suffixOk) {
-        return res.status(400).json({
-          error: `ID inválido para o tipo informado. Esperado prefixo ${prefixoEsperado} e sufixo numérico (ex: ${prefixoEsperado}001).`,
-        });
+        return sendApiError(
+          res,
+          400,
+          `ID inválido para o tipo informado. Esperado prefixo ${prefixoEsperado} e sufixo numérico (ex: ${prefixoEsperado}001).`,
+          { code: 'IMOVEL_ID_INVALID' }
+        );
       }
 
       if (!db.prisma) throw new Error('Prisma client não está disponível. Verifique a configuração do banco de dados.');
       const exists = await db.prisma.imovel.findUnique({ where: { id: requestedId }, select: { id: true } });
       if (exists) {
-        return res.status(409).json({ error: `ID já existe: ${requestedId}` });
+        return sendApiError(res, 409, `ID já existe: ${requestedId}`, { code: 'IMOVEL_ID_CONFLICT' });
       }
 
       novoId = requestedId;
@@ -1070,7 +1217,7 @@ app.post('/api/imoveis', authenticateAdmin, async (req: AuthRequest, res: Respon
     } else {
       detail = String(error);
     }
-    res.status(500).json({ error: 'Erro ao criar imóvel', detail });
+    sendApiError(res, 500, 'Erro ao criar imóvel', { code: 'IMOVEL_CREATE_ERROR', detail });
   }
 });
 
@@ -1127,7 +1274,7 @@ app.put('/api/imoveis/:id', authenticateAdmin, async (req: AuthRequest, res: Res
     res.json({ ok: true });
   } catch (error) {
     console.error('Erro ao atualizar imóvel:', error);
-    res.status(500).json({ error: 'Erro ao atualizar imóvel' });
+    sendApiError(res, 500, 'Erro ao atualizar imóvel', { code: 'IMOVEL_UPDATE_ERROR' });
   }
 });
 
@@ -1138,7 +1285,7 @@ app.delete('/api/imoveis/:id', authenticateAdmin, async (req: AuthRequest, res: 
     res.json({ ok: true });
   } catch (error) {
     console.error('Erro ao deletar imóvel:', error);
-    res.status(500).json({ error: 'Erro ao deletar imóvel' });
+    sendApiError(res, 500, 'Erro ao deletar imóvel', { code: 'IMOVEL_DELETE_ERROR' });
   }
 });
 
@@ -1162,7 +1309,7 @@ app.get('/api/leads/stats', authenticateAdmin, async (_req: AuthRequest, res: Re
     });
   } catch (error) {
     console.error('Erro ao buscar stats de leads:', error);
-    res.status(500).json({ error: 'Erro ao buscar estatísticas de leads' });
+    sendApiError(res, 500, 'Erro ao buscar estatísticas de leads', { code: 'LEADS_STATS_ERROR' });
   }
 });
 
@@ -1239,11 +1386,11 @@ app.get('/api/leads', authenticateAdmin, async (req: AuthRequest, res: Response)
     });
   } catch (error) {
     console.error('Erro ao buscar leads:', error);
-    res.status(500).json({ error: 'Erro ao buscar leads' });
+    sendApiError(res, 500, 'Erro ao buscar leads', { code: 'LEADS_LIST_ERROR' });
   }
 });
 
-app.post('/api/leads', async (req: Request, res: Response) => {
+app.post('/api/leads', leadCreateLimiter, async (req: Request, res: Response) => {
   try {
     const bodyLead = req.body || {};
     
@@ -1265,10 +1412,7 @@ app.post('/api/leads', async (req: Request, res: Response) => {
     const validation = validateAndFormat(leadSchema, leadData);
     if (!validation.success) {
       console.error('❌ Lead inválido:', validation.errors);
-      return res.status(400).json({ 
-        error: 'Dados do lead inválidos',
-        details: validation.errors
-      });
+      return sendApiError(res, 400, 'Dados do lead inválidos', { code: 'LEAD_INVALID', details: validation.errors });
     }
     const validatedLead = validation.data as any;
     console.log('📝 Lead POST:', { id: validatedLead.id, imovelId: validatedLead.imovelId, titulo: validatedLead.imovelTitulo });
@@ -1287,7 +1431,7 @@ app.post('/api/leads', async (req: Request, res: Response) => {
     res.json({ ok: true });
   } catch (error) {
     console.error('Erro ao criar lead:', error);
-    res.status(500).json({ error: 'Erro ao criar lead' });
+    sendApiError(res, 500, 'Erro ao criar lead', { code: 'LEAD_CREATE_ERROR' });
   }
 });
 
@@ -1298,25 +1442,22 @@ app.patch('/api/leads/:id', authenticateAdmin, async (req: AuthRequest, res: Res
     res.json({ ok: true });
   } catch (error) {
     console.error('Erro ao atualizar lead:', error);
-    res.status(500).json({ error: 'Erro ao atualizar lead' });
+    sendApiError(res, 500, 'Erro ao atualizar lead', { code: 'LEAD_UPDATE_ERROR' });
   }
 });
 
 // ==================== E-MAIL ====================
 
-app.post('/api/send-lead', async (req: Request, res: Response) => {
+app.post('/api/send-lead', sendLeadLimiter, async (req: Request, res: Response) => {
   const payload = req.body || {};
 
   // --- Validação com Zod ---
   const validation = validateAndFormat(sendLeadEmailSchema, payload);
   if (!validation.success) {
-    return res.status(400).json({ 
-      error: 'Dados do lead inválidos',
-      details: validation.errors
-    });
+    return sendApiError(res, 400, 'Dados do lead inválidos', { code: 'SEND_LEAD_INVALID', details: validation.errors });
   }
   
-  const { imovelId, imovelTitulo, preco, endereco, contato, link } = validation.data as any;
+  const { imovelId, imovelTitulo, preco, endereco, contato, link, mensagem } = validation.data as any;
 
   const to = process.env.MAIL_TO || process.env.MAIL_USER;
   const assunto = `Novo lead - ${imovelTitulo}`;
@@ -1328,6 +1469,7 @@ app.post('/api/send-lead', async (req: Request, res: Response) => {
     preco ? `Preço: ${preco}` : null,
     endereco ? `Localização: ${endereco}` : null,
     link ? `Link: ${link}` : null,
+    mensagem ? `Mensagem: ${mensagem}` : null,
     '',
     'Dados do cliente:',
     `Nome: ${contato.nome}`,
@@ -1378,7 +1520,7 @@ app.post('/api/send-lead', async (req: Request, res: Response) => {
     res.json({ ok: true, provider: 'smtp' });
   } catch (error) {
     console.error('Erro ao enviar e-mail:', error);
-    res.status(500).json({ error: 'Falha ao enviar e-mail', detail: String(error) });
+    sendApiError(res, 500, 'Falha ao enviar e-mail', { code: 'SEND_LEAD_ERROR', detail: String(error) });
   }
 });
 

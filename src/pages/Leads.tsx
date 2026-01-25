@@ -4,6 +4,7 @@ import { useImoveis } from '../contexts/ImoveisContext';
 import { formatarMoeda, obterFotoDestaque, formatarTelefone, otimizarUrlCloudinary } from '../utils/helpers';
 import { Users, Eye, Home, Building2, Mail, Phone, Calendar } from 'lucide-react';
 import { Skeleton } from '../components/Skeleton';
+import { ApiErrorBanner } from '../components/ApiErrorBanner';
 
 export const Leads: React.FC = () => {
   const {
@@ -19,6 +20,8 @@ export const Leads: React.FC = () => {
     carregarProximaPaginaLeads,
     aplicarFiltroLeadsVisualizado,
     definirOrdenacaoLeads,
+    apiError,
+    clearApiError,
   } = useImoveis();
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -97,6 +100,13 @@ export const Leads: React.FC = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
+        {apiError && (
+          <ApiErrorBanner
+            message={apiError}
+            onClose={clearApiError}
+            className="mb-6"
+          />
+        )}
         <div className="bg-white rounded-lg shadow-lg p-4 mb-6 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-sm font-semibold text-slate-700">Filtro:</span>

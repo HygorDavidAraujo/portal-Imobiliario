@@ -3,8 +3,9 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 import React, { useState, useRef, useEffect } from 'react';
 import logo from '../img/logo.png'; // Ajuste o caminho se necessário
+import { getJwtExpMs } from '../utils/jwt';
 
-const SESSION_DURATION = 60 * 60 * 1000; // 1 hora em ms
+const FALLBACK_SESSION_DURATION = 60 * 60 * 1000; // 1 hora em ms
 
 export const AdminLogin: React.FC = () => {
   const [step, setStep] = useState<'idle' | 'sent' | 'success'>('idle');
@@ -68,7 +69,9 @@ export const AdminLogin: React.FC = () => {
       setStep('success');
       // Salva token JWT e sessão
       localStorage.setItem('adminToken', data.token);
-      localStorage.setItem('adminSession', JSON.stringify({ expires: Date.now() + SESSION_DURATION }));
+      const tokenExp = typeof data.token === 'string' ? getJwtExpMs(data.token) : null;
+      const expires = typeof tokenExp === 'number' ? tokenExp : Date.now() + FALLBACK_SESSION_DURATION;
+      localStorage.setItem('adminSession', JSON.stringify({ expires }));
       setTimeout(() => window.location.href = '/admin', 1000);
     } catch (e: any) {
       setError(e.message || 'Código incorreto ou expirado.');
@@ -86,6 +89,7 @@ export const AdminLogin: React.FC = () => {
         window.location.href = '/admin';
       } else {
         localStorage.removeItem('adminSession');
+        localStorage.removeItem('adminToken');
       }
     }
   }, []);
