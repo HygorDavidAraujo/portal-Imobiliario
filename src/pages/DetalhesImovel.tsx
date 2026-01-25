@@ -239,6 +239,8 @@ export const DetalhesImovel: React.FC = () => {
   };
 
   const isCondominio = imovel.tipo.includes('Condomínio') || imovel.tipo === 'Apartamento';
+  const isRural = imovel.categoria === 'Rural';
+  const isApartamento = imovel.tipo === 'Apartamento';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -514,7 +516,7 @@ export const DetalhesImovel: React.FC = () => {
             })()}
 
             {/* Dados Rurais */}
-            {imovel.dadosRural && (() => {
+            {isRural && imovel.dadosRural && (() => {
               const recursos = [
                 { label: 'Rio', value: imovel.dadosRural.rio },
                 { label: 'Piscina', value: imovel.dadosRural.piscina },
@@ -531,6 +533,9 @@ export const DetalhesImovel: React.FC = () => {
                 { label: 'Acesso Asfalto', value: imovel.dadosRural.acessoAsfalto },
                 { label: 'Casarão Histórico', value: imovel.dadosRural.casariao },
               ].filter(item => item.value);
+
+              const hasAnyRuralInfo = Boolean(imovel.dadosRural.areaAlqueires || imovel.dadosRural.valorItr || recursos.length > 0);
+              if (!hasAnyRuralInfo) return null;
 
               return (
                 <div className="bg-white rounded-lg shadow-lg p-6">
@@ -576,7 +581,7 @@ export const DetalhesImovel: React.FC = () => {
             })()}
 
             {/* Dados do Apartamento */}
-            {imovel.dadosApartamento && (
+            {isApartamento && imovel.dadosApartamento && (
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <h2 className="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
                   <Building size={24} />

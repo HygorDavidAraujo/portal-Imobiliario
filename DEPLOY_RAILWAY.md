@@ -252,7 +252,16 @@ No painel do Railway, vá em "Variables" e adicione:
 # Banco de Dados (gerado automaticamente pelo Railway)
 DATABASE_URL=postgresql://...
 
+# Login admin (OTP)
+# Obrigatório em produção (use um valor aleatório forte)
+OTP_SECRET=uma-string-aleatoria-com-32-ou-mais-caracteres
+
 # Email
+# Opção A (recomendado): Resend
+RESEND_API_KEY=re_...
+MAIL_FROM=Portal Imobiliário <seu-remetente-verificado@seudominio.com>
+
+# Opção B: SMTP (Gmail/App Password, etc)
 MAIL_HOST=smtp.gmail.com
 MAIL_PORT=465
 MAIL_USER=seu-email@gmail.com
@@ -270,6 +279,9 @@ CLOUDINARY_URL=cloudinary://API_KEY:API_SECRET@CLOUD_NAME
 # Server
 PORT=4000
 NODE_ENV=production
+
+# (Opcional) CORS
+FRONTEND_URL=https://seu-front.vercel.app
 ```
 
 #### 2.5 Configurar Build

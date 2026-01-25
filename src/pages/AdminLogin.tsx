@@ -38,8 +38,10 @@ export const AdminLogin: React.FC = () => {
     try {
       // Chamada para backend gerar e enviar OTP
       const res = await fetch(`${API_BASE_URL}/api/admin/send-otp`, { method: 'POST' });
-      await res.json();
-      if (!res.ok) throw new Error('Erro ao enviar código.');
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error || 'Erro ao enviar código.');
+      }
       setStep('sent');
       setTimer(60);
       // Não exibe mais OTP nem wa.me
