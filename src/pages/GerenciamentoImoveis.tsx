@@ -566,7 +566,7 @@ export const GerenciamentoImoveis: React.FC = () => {
       imovelFinal.dadosRural = {
         rio, piscina: piscinaRural, represa, lago, curral, estabulo, galinheiro, pocilga,
         silo, terraceamento, energia, agua, acessoAsfalto, casariao,
-        areaAlqueires: sanitize(parseFloat(areaAlqueires)),
+        areaAlqueires: sanitize(converterValorBrasileiroParaNumero(areaAlqueires)),
         tipoAlqueire,
         valorItr: sanitize(converterValorBrasileiroParaNumero(valorItr)),
       };
