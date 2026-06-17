@@ -99,7 +99,6 @@ export const GerenciamentoImoveis: React.FC = () => {
   const [acessoAsfalto, setAcessoAsfalto] = useState(false);
   const [casariao, setCasariao] = useState(false);
   const [tipoAlqueire, setTipoAlqueire] = useState<TipoAlqueire>('Goiano');
-  const [areaAlqueires, setAreaAlqueires] = useState('0');
   const [valorItr, setValorItr] = useState('');
   
   // Tipologia
@@ -214,7 +213,6 @@ export const GerenciamentoImoveis: React.FC = () => {
       setAcessoAsfalto(imovel.dadosRural.acessoAsfalto || false);
       setCasariao(imovel.dadosRural.casariao || false);
       setTipoAlqueire(imovel.dadosRural.tipoAlqueire || 'Goiano');
-      setAreaAlqueires(imovel.dadosRural.areaAlqueires?.toString() || '0');
       setValorItr(imovel.dadosRural.valorItr ? formatarValorBrasileiro(imovel.dadosRural.valorItr) : '');
     }
     
@@ -486,6 +484,13 @@ export const GerenciamentoImoveis: React.FC = () => {
     } as Imovel;
 
     const sanitize = (num: number) => (Number.isNaN(num) ? undefined : num);
+    const parseBrasileiro = (value: string) => converterValorBrasileiroParaNumero(value);
+    const calcularAreaAlqueires = (): number | undefined => {
+      const areaM2 = parseBrasileiro(areaTotal);
+      if (Number.isNaN(areaM2) || areaM2 <= 0) return undefined;
+      const divisor = tipoAlqueire === 'Paulista' ? 24200 : tipoAlqueire === 'Baiano' ? 96800 : 48400;
+      return sanitize(areaM2 / divisor);
+    };
 
     const imovelFinal: Imovel = {
       ...baseImovel,
@@ -501,8 +506,8 @@ export const GerenciamentoImoveis: React.FC = () => {
       },
       fichaTecnica: {
         ...baseImovel.fichaTecnica,
-        areaTotal: sanitize(parseFloat(areaTotal)),
-        areaConstruida: sanitize(parseFloat(areaConstruida)),
+        areaTotal: sanitize(parseBrasileiro(areaTotal)),
+        areaConstruida: sanitize(parseBrasileiro(areaConstruida)),
         quartos: sanitize(parseInt(quartos)),
         suites: sanitize(parseInt(suites)),
         banheiros: sanitize(parseInt(banheiros)),
@@ -517,8 +522,8 @@ export const GerenciamentoImoveis: React.FC = () => {
         varandaGourmet,
         piscinaPrivativa,
         churrasqueiraPrivativa,
-        valorIptu: categoria === 'Rural' ? undefined : sanitize(converterValorBrasileiroParaNumero(valorIptu)),
-        valorItu: categoria === 'Rural' ? undefined : sanitize(converterValorBrasileiroParaNumero(valorItu)),
+        valorIptu: categoria === 'Rural' ? undefined : sanitize(parseBrasileiro(valorIptu)),
+        valorItu: categoria === 'Rural' ? undefined : sanitize(parseBrasileiro(valorItu)),
       },
       tipologia: {
         ...baseImovel.tipologia,
@@ -566,9 +571,9 @@ export const GerenciamentoImoveis: React.FC = () => {
       imovelFinal.dadosRural = {
         rio, piscina: piscinaRural, represa, lago, curral, estabulo, galinheiro, pocilga,
         silo, terraceamento, energia, agua, acessoAsfalto, casariao,
-        areaAlqueires: sanitize(converterValorBrasileiroParaNumero(areaAlqueires)),
+        areaAlqueires: calcularAreaAlqueires(),
         tipoAlqueire,
-        valorItr: sanitize(converterValorBrasileiroParaNumero(valorItr)),
+        valorItr: sanitize(parseBrasileiro(valorItr)),
       };
     } else {
       delete imovelFinal.dadosRural;
@@ -1458,7 +1463,7 @@ export const GerenciamentoImoveis: React.FC = () => {
                     </label>
                     <input
                       type="text"
-                      value={areaTotal ? (parseFloat(areaTotal) / (tipoAlqueire === 'Paulista' ? 24200 : tipoAlqueire === 'Baiano' ? 96800 : 48400)).toFixed(2) : '0'}
+                      value={areaTotal ? (converterValorBrasileiroParaNumero(areaTotal) / (tipoAlqueire === 'Paulista' ? 24200 : tipoAlqueire === 'Baiano' ? 96800 : 48400)).toFixed(2) : '0'}
                       disabled
                       className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-slate-100 text-slate-600 font-semibold"
                     />
